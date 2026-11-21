@@ -1,0 +1,287 @@
+                  ; =====================================================================
+                  ; I2C master v1.0 for the Sharp PC-1600 - runs on the main CPU (Z80, SC-7852)
+                  ;
+                  ; Pins of the 60-pin system bus connector:
+                  ;   SCL      = pin 29 (CMTOUT = SDO of the SC-7852)   OUT (18H),A bit 7   (through a diode)
+                  ;   SDA read = pin 27 (CMTIN  = PB2 of the SC-7852)   IN A,(1FH) bit 2    (through 470 ohm)
+                  ;   SDA pull = pin 31 (A8, address bus bit 8)         (through a diode)
+                  ;
+                  ; THE TRICK: PB2 is an input only, and the SC-7852 has no second static output
+                  ; pin, so SDA is driven by the ADDRESS BUS. The Z80 drives A8 all the time:
+                  ; during an opcode fetch (T1-T2) it shows bit 0 of the high byte of the PC, and
+                  ; during the refresh (T3-T4) it shows bit 0 of the I register. If both are the
+                  ; same, A8 is a static level. So the SDA level is encoded in the PAGE the code
+                  ; runs in AND in the I register:
+                  ;       page with A8 = 1 and I odd  -> SDA released (the diode blocks)
+                  ;       page with A8 = 0 and I even -> SDA pulled low through the diode
+                  ; While the code runs in such a page, A8 is clean. SDA may only be disturbed
+                  ; (A8 chops) while SCL is low; START and STOP need one clean edge while SCL is
+                  ; high, so they cross a page boundary: LD I,A is the last instruction of the
+                  ; page and the next instruction is the first of the next page.
+                  ;
+                  ; Rules for code that runs while SCL is high (windows):
+                  ;   - only registers, IN/OUT and jumps inside the page, NO memory access
+                  ;     (no stack, no buffers), because that would put another address on A8;
+                  ;   - the A register has bit 0 = the SDA level during OUT/IN (OUT (n),A puts A
+                  ;     on the address lines A15-A8 during the I/O cycle).
+                  ; The code changes the I register and must be called with interrupts off.
+                  ;
+                  ; Memory (Z80 addresses; reserve it with NEW "S0:",&1000):
+                  ;   C100-C1FF  page H1 (A8 = 1): bit loops with SDA = 1, START (first half)
+                  ;   C200-C2FF  page L1 (A8 = 0): bit loops with SDA = 0, START (second half),
+                  ;                                STOP (first half)
+                  ;   C300-C3FF  page H2 (A8 = 1): STOP (second half)
+                  ;   C400-C5FA  main code (entry C400)
+                  ;   C5FB       CNT   byte counter
+                  ;   C5FC       IA    device address (7 bits)
+                  ;   C5FD       IW    number of bytes to write from TX (0-255)
+                  ;   C5FE       IR    number of bytes to read into RX (0-255)
+                  ;   C5FF       IS    result
+                  ;   C600-C6FF  RX    bytes read
+                  ;   C700-C7FF  TX    bytes to write
+                  ;
+                  ; Call (BASIC):  POKE &C5FC, D, W, R : CALL &C400, E
+                  ;   W > 0 (or W = 0 and R = 0): START, address+write, TX[0..W-1]
+                  ;   R > 0:  (repeated) START, address+read, R bytes into RX (ACK all, NACK last)
+                  ;   then STOP.   Result E (also in &C5FF): 0 OK, 1 no ACK after the address,
+                  ;   2 no ACK after a data byte, 3 SDA stuck low (nothing sent).
+                  ; Registers used: AF, BC, DE, HL, I (restored). Interrupts are restored.
+                  ; =====================================================================
+                  
+                  HV      EQU 0C1h        ; I for the pages with A8 = 1 (SDA released)
+                  LV      EQU 0C2h        ; I for the pages with A8 = 0 (SDA low)
+                  OPC     EQU 18h         ; port: bit 7 -> SDO (pin 29, SCL), bit 6 -> buzzer (keep 0)
+                  DDB     EQU 1Dh         ; port B direction (bit 2 = PB2 must be an input)
+                  PBP     EQU 1Fh         ; port B data (bit 2 = SDA read back)
+                  
+                  S_H1    EQU 81h         ; SCL = 1, A register bit 0 = 1 (A8 = 1)
+                  S_L1    EQU 01h         ; SCL = 0, A8 = 1
+                  S_H0    EQU 80h         ; SCL = 1, A8 = 0
+                  S_L0    EQU 00h         ; SCL = 0, A8 = 0
+                  
+                  RX      EQU 0C600h
+                  TX      EQU 0C700h
+                  CNT     EQU 0C5FBh
+                  IA      EQU 0C5FCh
+                  IW      EQU 0C5FDh
+                  IR      EQU 0C5FEh
+                  IS      EQU 0C5FFh
+                  
+                  ; ---------------------------------------------------------------------
+                  ; page H1 (A8 = 1, I = HV): SDA released
+                  ; ---------------------------------------------------------------------
+                          ORG 0C100h
+C100  CB 01        SH:     RLC C                   ; next data bit -> carry
+C102  D2 1D C1             JP NC,SH_L              ; a 0 bit: SDA must go low
+C105  3E 81        SH_CLK: LD A,S_H1
+C107  D3 18                OUT (OPC),A             ; SCL = 1
+C109  00                   NOP
+C10A  3E 01                LD A,S_L1
+C10C  D3 18                OUT (OPC),A             ; SCL = 0
+C10E  10 F0                DJNZ SH                 ; 8 bits
+C110  3E 81        WH:     LD A,S_H1               ; one clock with SDA released (ACK bit read,
+C112  D3 18                OUT (OPC),A             ; NACK sent, bus recovery); CALL entry too
+C114  00                   NOP
+C115  DB 1F                IN A,(PBP)              ; SDA as seen on the bus, bit 2
+C117  57                   LD D,A
+C118  3E 01                LD A,S_L1
+C11A  D3 18                OUT (OPC),A
+C11C  C9                   RET
+C11D  3E C2        SH_L:   LD A,LV                 ; SCL is low: A8 may chop
+C11F  ED 47                LD I,A
+C121  C3 0C C2             JP SL_CLK
+                  
+C124  3E 81        RH:     LD A,S_H1               ; read one bit (8 times), SDA released
+C126  D3 18                OUT (OPC),A
+C128  00                   NOP
+C129  DB 1F                IN A,(PBP)
+C12B  57                   LD D,A
+C12C  3E 01                LD A,S_L1
+C12E  D3 18                OUT (OPC),A
+C130  7A                   LD A,D
+C131  1F                   RRA                     ; bit 2 -> carry after three shifts
+C132  1F                   RRA
+C133  1F                   RRA
+C134  CB 13                RL E                    ; carry -> E, MSB first
+C136  10 EC                DJNZ RH
+C138  C9                   RET
+                  
+                          ORG 0C1F5h              ; the last 11 bytes of the page: START
+C1F5  3E 81        STH:    LD A,S_H1
+C1F7  D3 18                OUT (OPC),A             ; SCL = 1 (SDA is 1)
+C1F9  00                   NOP
+C1FA  00                   NOP
+C1FB  00                   NOP
+C1FC  3E C2                LD A,LV
+C1FE  ED 47                LD I,A                  ; last instruction of the page: the next one
+                                                  ; (C200) is fetched with A8 = 0: SDA falls
+                  
+                  ; ---------------------------------------------------------------------
+                  ; page L1 (A8 = 0, I = LV): SDA pulled low
+                  ; ---------------------------------------------------------------------
+                          ORG 0C200h
+C200  00           STT:    NOP                     ; START hold time
+C201  00                   NOP
+C202  3E 00                LD A,S_L0
+C204  D3 18                OUT (OPC),A             ; SCL = 0
+C206  C9                   RET                     ; back to the caller of START
+                  
+C207  CB 01        SL:     RLC C
+C209  DA 1E C2             JP C,SL_H               ; a 1 bit: SDA must go high
+C20C  3E 80        SL_CLK: LD A,S_H0
+C20E  D3 18                OUT (OPC),A             ; SCL = 1
+C210  00                   NOP
+C211  3E 00                LD A,S_L0
+C213  D3 18                OUT (OPC),A             ; SCL = 0
+C215  10 F0                DJNZ SL
+C217  3E C1                LD A,HV                 ; SDA released for the ACK bit
+C219  ED 47                LD I,A
+C21B  C3 10 C1             JP WH
+C21E  3E C1        SL_H:   LD A,HV
+C220  ED 47                LD I,A
+C222  C3 05 C1             JP SH_CLK
+                  
+C225  3E 80        WL:     LD A,S_H0               ; one clock with SDA low (ACK sent)
+C227  D3 18                OUT (OPC),A
+C229  00                   NOP
+C22A  3E 00                LD A,S_L0
+C22C  D3 18                OUT (OPC),A
+C22E  C9                   RET
+                  
+                          ORG 0C2F5h              ; the last 11 bytes of the page: STOP
+C2F5  3E 80        STL:    LD A,S_H0
+C2F7  D3 18                OUT (OPC),A             ; SCL = 1 (SDA is 0)
+C2F9  00                   NOP
+C2FA  00                   NOP
+C2FB  00                   NOP
+C2FC  3E C1                LD A,HV
+C2FE  ED 47                LD I,A                  ; the next instruction (C300) has A8 = 1: SDA rises
+                  
+                  ; ---------------------------------------------------------------------
+                  ; page H2 (A8 = 1, I = HV)
+                  ; ---------------------------------------------------------------------
+                          ORG 0C300h
+C300  00           STP2:   NOP                     ; bus free time
+C301  00                   NOP
+C302  00                   NOP
+C303  3E 01                LD A,S_L1
+C305  D3 18                OUT (OPC),A             ; SCL = 0, SDA released
+C307  C9                   RET                     ; back to the caller of STOP
+                  
+                  ; ---------------------------------------------------------------------
+                  ; main code: A8 may chop here (SCL is always low)
+                  ; ---------------------------------------------------------------------
+                          ORG 0C400h
+C400  3E 01        IC:     LD A,S_L1
+C402  D3 18                OUT (OPC),A             ; SCL low at once: from here on A8 may chop
+C404  ED 57                LD A,I
+C406  F5                   PUSH AF                 ; I and IFF2 (P/V flag)
+C407  F3                   DI
+C408  DB 1D                IN A,(DDB)
+C40A  E6 FB                AND 0FBh
+C40C  D3 1D                OUT (DDB),A             ; PB2 = input
+C40E  AF                   XOR A
+C40F  32 FF C5             LD (IS),A
+C412  CD B8 C4             CALL BUSCHK
+C415  DA B1 C4             JP C,E3
+C418  3A FD C5             LD A,(IW)
+C41B  B7                   OR A
+C41C  20 06                JR NZ,DOWR
+C41E  3A FE C5             LD A,(IR)
+C421  B7                   OR A
+C422  20 35                JR NZ,DORD              ; W = 0, R > 0: read at once
+C424  CD CB C4     DOWR:   CALL START
+C427  3A FC C5             LD A,(IA)
+C42A  87                   ADD A,A
+C42B  4F                   LD C,A                  ; address, write bit = 0
+C42C  CD D9 C4             CALL SENDB
+C42F  CB 52                BIT 2,D
+C431  C2 A3 C4             JP NZ,E1                ; no ACK
+C434  3A FD C5             LD A,(IW)
+C437  B7                   OR A
+C438  28 19                JR Z,AFTW
+C43A  32 FB C5             LD (CNT),A
+C43D  21 00 C7             LD HL,TX
+C440  4E           WLP:    LD C,(HL)
+C441  23                   INC HL
+C442  CD D9 C4             CALL SENDB
+C445  CB 52                BIT 2,D
+C447  C2 A7 C4             JP NZ,E2
+C44A  3A FB C5             LD A,(CNT)
+C44D  3D                   DEC A
+C44E  32 FB C5             LD (CNT),A
+C451  20 ED                JR NZ,WLP
+C453  3A FE C5     AFTW:   LD A,(IR)
+C456  B7                   OR A
+C457  28 38                JR Z,DOSTOP
+C459  CD CB C4     DORD:   CALL START              ; (repeated) START
+C45C  3A FC C5             LD A,(IA)
+C45F  87                   ADD A,A
+C460  3C                   INC A
+C461  4F                   LD C,A                  ; address, read bit = 1
+C462  CD D9 C4             CALL SENDB
+C465  CB 52                BIT 2,D
+C467  C2 A3 C4             JP NZ,E1
+C46A  3A FE C5             LD A,(IR)
+C46D  32 FB C5             LD (CNT),A
+C470  21 00 C6             LD HL,RX
+C473  CD E2 C4     RLP:    CALL RECVB
+C476  73                   LD (HL),E
+C477  23                   INC HL
+C478  3A FB C5             LD A,(CNT)
+C47B  3D                   DEC A
+C47C  32 FB C5             LD (CNT),A
+C47F  28 09                JR Z,RLAST
+C481  3E C2                LD A,LV
+C483  ED 47                LD I,A
+C485  CD 25 C2             CALL WL                 ; ACK
+C488  18 E9                JR RLP
+C48A  3E C1        RLAST:  LD A,HV
+C48C  ED 47                LD I,A
+C48E  CD 10 C1             CALL WH                 ; NACK after the last byte
+C491  CD D2 C4     DOSTOP: CALL STOP
+C494  F1           EXIT:   POP AF
+C495  ED 47                LD I,A                  ; I restored (flags are not changed)
+C497  E2 9B C4             JP PO,EX2               ; P/V = IFF2: interrupts were off
+C49A  FB                   EI
+C49B  3A FF C5     EX2:    LD A,(IS)
+C49E  5F                   LD E,A
+C49F  16 00                LD D,0
+C4A1  37                   SCF                     ; CALL IC,E returns the result in E
+C4A2  C9                   RET
+C4A3  3E 01        E1:     LD A,1
+C4A5  18 02                JR ERR
+C4A7  3E 02        E2:     LD A,2
+C4A9  32 FF C5     ERR:    LD (IS),A
+C4AC  CD D2 C4             CALL STOP
+C4AF  18 E3                JR EXIT
+C4B1  3E 03        E3:     LD A,3
+C4B3  32 FF C5             LD (IS),A
+C4B6  18 DC                JR EXIT
+                  
+C4B8  3E C1        BUSCHK: LD A,HV                 ; up to 10 clocks until SDA is high
+C4BA  ED 47                LD I,A
+C4BC  06 0A                LD B,10
+C4BE  CD 10 C1     BC1:    CALL WH
+C4C1  CB 52                BIT 2,D
+C4C3  20 04                JR NZ,BCOK
+C4C5  10 F7                DJNZ BC1
+C4C7  37                   SCF                     ; SDA stuck low
+C4C8  C9                   RET
+C4C9  B7           BCOK:   OR A
+C4CA  C9                   RET
+                  
+C4CB  3E C1        START:  LD A,HV
+C4CD  ED 47                LD I,A
+C4CF  C3 F5 C1             JP STH
+C4D2  3E C2        STOP:   LD A,LV
+C4D4  ED 47                LD I,A
+C4D6  C3 F5 C2             JP STL
+C4D9  3E C2        SENDB:  LD A,LV                 ; send the byte in C, then read the ACK bit into D
+C4DB  ED 47                LD I,A
+C4DD  06 08                LD B,8
+C4DF  C3 07 C2             JP SL
+C4E2  3E C1        RECVB:  LD A,HV                 ; read a byte into E
+C4E4  ED 47                LD I,A
+C4E6  06 08                LD B,8
+C4E8  C3 24 C1             JP RH

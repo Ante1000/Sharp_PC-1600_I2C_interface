@@ -79,8 +79,11 @@ pin 52-54 GND ──────────────────────
 3. `RUN 500` is the **scanner** (tries every address 8 to 119 and lists the devices that
    answer, address in hex). `RUN 700` is a **test**: it asks for an address, the bytes to write
    and the number of bytes to read.
-4. The code stays in memory when you erase the program with `NEW` in PRO mode, as long as you
-   keep the reservation (do not repeat `NEW "S0:"` with a smaller size).
+4. To load another program (for example the BMP280 program) afterwards, type
+   `NEW "S0:",&1000` again with the **same size** (a plain `NEW` would release the
+   machine-language area). That erases the BASIC program only; the programs that use the driver
+   check that the code is still there (`PEEK &C400` = 62) and say `I2C NOT INSTALLED` if it is
+   not: run the installer again then. After a reset or a power failure check the same way.
 
 ## Use in your programs
 
@@ -178,9 +181,8 @@ START/STOP times 7-8 µs: all comfortably inside the standard mode (100 kHz) min
 [PC-1500 BMP280 program](https://github.com/Ante1000/Sharp_PC-1500_I2C_interface/blob/main/BMP280_thermo_baro_Example.md)
 (same module and settings: address &77 with SDO at VDDIO, forced mode, oversampling 1 to 16 and
 IIR filter chosen at the start, datasheet compensation in floating point). Install the I2C
-driver first (`NEW "S0:",&1000`, installer, then `NEW` in PRO mode is not needed: type the
-BMP280 program after the installer has run, or load it into the memory above the machine-language
-area), then `RUN`. It shows
+driver first (`NEW "S0:",&1000`, installer), then type `NEW "S0:",&1000` again, load the
+BMP280 program and then `RUN`. It shows
 
 ```
 Temperature = 25.08 C

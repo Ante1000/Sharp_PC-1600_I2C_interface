@@ -172,6 +172,28 @@ For comparison, the PC-1500 driver (LH5801, 1.3 MHz) reaches 17.5 kHz and 1884 b
 driver should be about twice as fast. The shortest clock phases are tHIGH 6.2 µs and tLOW 7.3 µs,
 START/STOP times 7-8 µs: all comfortably inside the standard mode (100 kHz) minimum times.
 
+## Example: BMP280 thermometer and barometer
+
+`Basic/pc1600_bmp280-v1.0.txt` is the PC-1600 version of the
+[PC-1500 BMP280 program](https://github.com/Ante1000/Sharp_PC-1500_I2C_interface/blob/main/BMP280_thermo_baro_Example.md)
+(same module and settings: address &77 with SDO at VDDIO, forced mode, oversampling 1 to 16 and
+IIR filter chosen at the start, datasheet compensation in floating point). Install the I2C
+driver first (`NEW "S0:",&1000`, installer, then `NEW` in PRO mode is not needed: type the
+BMP280 program after the installer has run, or load it into the memory above the machine-language
+area), then `RUN`. It shows
+
+```
+Temperature = 25.08 C
+Pressure = 1006.53 hPa
+I2C approx. 34 kHz
+```
+
+The speed is measured with 255-byte reads from the sensor for 3 seconds with the clock of the
+computer (`TIME`) as the time base, counting the SCL clocks (2322 per read). It is an
+approximate **effective** value, a few percent below the real SCL frequency because it includes the
+BASIC statements between the reads. It is measured at the start, and again when you press **S**
+during the measurement loop (any other key stops the program).
+
 ## Limitations
 
 - **Pin 29 (SDO) should be low when the computer is idle.** If it is high, the first
@@ -237,6 +259,7 @@ compared with the real machine.
 |---|---|
 | `asm/i2c_z80_v1.0.asm`, `.lst` | Z80 source with the explanation, and the listing with the bytes |
 | `Basic/pc1600_i2c_installer-v1.0.txt` | BASIC installer, scanner and test |
+| `Basic/pc1600_bmp280-v1.0.txt` | thermometer and barometer with a BMP280 (address &77) that also shows the approximate I2C speed, see below |
 | `tools/` | mini assembler, simulator with the tests, installer generator |
 | `docs/design_notes.md` | analysis: pins, registers, alternatives that were considered |
 

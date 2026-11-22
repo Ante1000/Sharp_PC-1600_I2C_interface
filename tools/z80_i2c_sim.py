@@ -497,9 +497,12 @@ TX, RX = 0xC700, 0xC600
 IC = 0xC400
 
 
+ASM_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'asm', 'i2c_z80_v1.0.asm')
+
+
 def build():
     a = Assembler()
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'asm', 'i2c_z80_v1.0.asm')
+    path = ASM_PATH
     a.assemble(open(path).read())
     return a
 
@@ -764,6 +767,19 @@ def main():
     check('stuck forever', r['result'] == 3 and not s.written, r['result'])
     check('stuck forever: I and IFF restored', r['iok'] and r['iffok'])
 
+    # port benchmark routines of the lab versions (BO = 2560 OUT, BI = 2560 IN, BN = 2560 NOP)
+    if 0xC500 in asm.image:
+        for name, ad in (('BO', 0xC500), ('BI', 0xC520), ('BN', 0xC540)):
+            hub = Hub(Slave(0x42))
+            cpu = Z80(hub)
+            for a_, b_ in asm.image.items():
+                cpu.mem[a_] = b_
+            cpu.call(ad)
+            check('bench %s returns with interrupts on' % name, cpu.iff1 == 1)
+            if name == 'BO':
+                check('bench BO: 2560 OUT', cpu.opc_writes == 2560, cpu.opc_writes)
+            print('bench %s: %.3f ms in the simulator' % (name, cpu.t * US / 1000))
+
     # summary
     sts = [s for s in allstats if 'f_kHz_avg' in s]
     print('SCL average over all tests: %.1f kHz (min %.1f max %.1f)' %
@@ -779,7 +795,11 @@ def main():
 
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1 and sys.argv[1].startswith('--iow='):
-        Z80.IOW = int(sys.argv[1].split('=')[1])
-        print('extra I/O wait states: %d' % Z80.IOW)
+    for arg in sys.argv[1:]:
+        if arg.startswith('--iow='):
+            Z80.IOW = int(arg.split('=')[1])
+            print('extra I/O wait states: %d' % Z80.IOW)
+        elif arg.startswith('--asm='):
+            ASM_PATH = arg.split('=', 1)[1]
+            print('source:', ASM_PATH)
     sys.exit(1 if main() else 0)

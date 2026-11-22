@@ -16,7 +16,7 @@ sys.path.insert(0, here)
 from z80asm_mini import Assembler
 
 ASM = os.path.join(here, '..', 'asm', 'i2c_z80_v1.0.asm')
-OUT = os.path.join(here, '..', 'Basic', 'pc1600_i2c_installer-v1.0.txt')
+OUT = os.path.join(here, '..', 'Basic', 'archive', 'pc1600_i2c_installer-v1.0.txt')
 PER_LINE = 10
 
 HEAD = [

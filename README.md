@@ -1,6 +1,6 @@
 # I2C interface for the Sharp PC-1600 (Z80)
 
-**I2C master v1.0 for the PC-1600** by Alex F4VTS
+**I2C master v1.1 for the PC-1600** by Alex F4VTS
 
 A machine-language routine for the **main CPU of the PC-1600 (Z80, SC-7852)** that turns the
 computer into an **I2C bus master** with no dedicated interface and no modification of the
@@ -9,12 +9,11 @@ computer. It uses three pins of the 60-pin system bus connector: **pin 29** (SCL
 [I2C interface for the Sharp PC-1500(A)](https://github.com/Ante1000/Sharp_PC-1500_I2C_interface),
 and the call interface is the same.
 
-> **Status (please read).** The driver has been written and tested **only in a simulator**
-> (Z80 with the bus cycles of every instruction, the I2C wires and simulated I2C devices, see
-> [Simulation](#simulation)). It has **not yet been run on a real PC-1600**. The ideas it
-> depends on were measured on a real PC-1600 (see [Measurements](#measurements-on-a-real-pc-1600)),
-> but the whole driver on a real bus is the next step. Please check the wiring carefully and
-> report your results.
+> **Status.** The driver was developed in a simulator and **runs on a real PC-1600**: version 1.1
+> reads at about **43 kHz** and writes at about **54 kHz**; the BMP280 program works (255-byte read in
+> 50 to 54 ms). Details of how it got there are in the [speed lab](#z80-speed-lab) section. The wiring
+> and the measurements are described below; please check the wiring carefully (a **jumper or switch in the
+> pin 31 wire** is a good idea for the first tests).
 
 ## Why this is not a port of the PC-1500 code
 
@@ -71,19 +70,22 @@ pin 52-54 GND ──────────────────────
 
 ## Installation
 
-1. Switch the PC-1600 on in the PRO or RUN mode with a free memory and type
-   `NEW "S0:",&1000` [ENTER] (this reserves the machine-language area &C0C5 to &CFFF and erases
-   the BASIC program in memory).
-2. Type in `Basic/pc1600_i2c_installer-v1.0.txt` (or load it from a file) and `RUN` it. It
-   POKEs 369 bytes into &C100 to &C4EA and prints `I2C Z80 V1.0 INSTALLED`.
+1. Switch the PC-1600 on in the PRO or RUN mode with a free memory and type `NEW0` [ENTER], then
+   `NEW "S0:",&800` [ENTER] (this reserves the machine-language area &C0C5 to &C7FF and erases the BASIC
+   program in memory). **Never `NEW0` alone**: without the reserved area the installer overwrites the BASIC program.
+2. Load `Basic/pc1600_i2c_installer-v1.1.txt` (from the tape recording, over the serial port, or type it) and `RUN` it. It
+   POKEs 731 bytes into &C100 to &C596 and prints `I2C Z80 V1.1 INSTALLED`.
 3. `RUN 500` is the **scanner** (tries every address 8 to 119 and lists the devices that
    answer, address in hex). `RUN 700` is a **test**: it asks for an address, the bytes to write
    and the number of bytes to read.
-4. To load another program (for example the BMP280 program) afterwards, type
-   `NEW "S0:",&1000` again with the **same size** (a plain `NEW` would release the
+4. To load another program (for example `Basic/pc1600_bmp280-v1.1.txt`) afterwards, type
+   `NEW "S0:",&800` again with the **same size** (a plain `NEW` would release the
    machine-language area). That erases the BASIC program only; the programs that use the driver
    check that the code is still there (`PEEK &C400` = 62) and say `I2C NOT INSTALLED` if it is
    not: run the installer again then. After a reset or a power failure check the same way.
+
+The current files are `Basic/pc1600_i2c_installer-v1.1.txt` and `Basic/pc1600_bmp280-v1.1.txt` (with their recordings in `wav/`);
+everything else (version 1.0, the LH-5803 variant, the combined programs, the speed lab, the port lab) is in `Basic/archive/` and `wav/archive/`.
 
 ## Use in your programs
 
@@ -164,56 +166,50 @@ needs two copies of the bit loop and the page alignment.
 
 ## Speed
 
-From the simulator (3.58 MHz Z80, no allowance for a real machine being a few percent slower):
-
-| Transfer | SCL average | Time | Bytes/s |
-|---|---|---|---|
-| write 255 bytes | 37.1 kHz | 62 ms | about 4100 |
-| read 255 bytes | 34.4 kHz | 67 ms | about 3800 |
-
-For comparison, the PC-1500 driver (LH5801, 1.3 MHz) reaches 17.5 kHz and 1884 bytes/s, so this
-driver should be about twice as fast. The shortest clock phases are tHIGH 6.2 µs and tLOW 7.3 µs,
-START/STOP times 7-8 µs: all comfortably inside the standard mode (100 kHz) minimum times.
+Measured on the real PC-1600 with the driver v1.1 (see the speed lab): **about 43 kHz read, 54 kHz write**; a 255-byte read takes 50 to 54 ms,
+a 255-byte write about 43 ms. The first version (v1.0) reached 32 kHz read / 40 kHz write in the same lab method; the PC-1500 driver (LH5801, 1.3 MHz) reaches 17.5 kHz.
+The real machine adds one wait state to every opcode fetch and one to every I/O cycle, which makes it about 20 % slower than an ideal 3.58 MHz Z80
+(the simulator reaches 56 kHz; its option `--real` reproduces the real machine). SCL high is about 4 us and low more than 5 us, inside the
+fast mode (400 kHz) minimum times of the BMP280 and most devices, and about the standard mode (100 kHz) minimum for the high time.
 
 ## Example: BMP280 thermometer and barometer
 
-`Basic/pc1600_bmp280-v1.0.txt` is the PC-1600 version of the
+`Basic/pc1600_bmp280-v1.1.txt` is the PC-1600 version of the
 [PC-1500 BMP280 program](https://github.com/Ante1000/Sharp_PC-1500_I2C_interface/blob/main/BMP280_thermo_baro_Example.md)
 (same module and settings: address &77 with SDO at VDDIO, forced mode, oversampling 1 to 16 and
 IIR filter chosen at the start, datasheet compensation in floating point). Install the I2C
-driver first (`NEW "S0:",&1000`, installer), then type `NEW "S0:",&1000` again, load the
+driver first (`NEW0`, `NEW "S0:",&800`, installer), then type `NEW "S0:",&800` again, load the
 BMP280 program and then `RUN`. It shows
 
 ```
 Temperature = 25.08 C
 Pressure = 1006.53 hPa
-I2C approx. 34 kHz
+I2C approx. 45 kHz
 ```
 
-The speed is measured with 255-byte reads from the sensor for 4 seconds with the clock of the
-computer (`TIME`, read after every 4 reads to keep its overhead small) as the time base, counting the SCL clocks (2322 per read); the time of one 255-byte read in ms is printed too. It is an
-approximate **effective** value, a few percent below the real SCL frequency because it includes the
-BASIC statements between the reads. It is measured at the start, and again when you press **S**
-during the measurement loop (any other key stops the program).
+The speed is measured with the routine `REP` of the driver (10 reads of 255 bytes per BASIC `CALL`): the program times an empty `CALL` for 8 s, then the reads
+for 16 s with the clock of the computer (`TIME`), subtracts the time of the empty calls and counts the SCL clocks (2322 per read); the time of one 255-byte read in ms is printed too.
+The measurement takes about 25 s and is made at the start and again when you press **S** during the measurement loop (any other key stops the program).
+It needs the driver v1.1 (the installer contains `REP`).
 
 ## Loading from tape
 
-**With a CE-1600P or CE-152 (MODE 0, PC-1600 tape format):** play `wav/pc1600_i2c_installer-v1.0_mode0_CE-1600P.wav` and
-`LOAD "CAS:I2CZ80"` (after `NEW "S0:",&1000`), `RUN`; later `NEW "S0:",&1000` again and
-`LOAD "CAS:BMP280"` with `wav/pc1600_bmp280-v1.0_mode0_CE-1600P.wav` (about 2 to 3 minutes each).
+**With a CE-1600P or CE-152 (MODE 0, PC-1600 tape format):** type `NEW0` and `NEW "S0:",&800`, play `wav/pc1600_i2c_installer-v1.1_mode0_CE-1600P.wav` and
+`LOAD "CAS:I2CZ80"`, `RUN`; later `NEW "S0:",&800` again and
+`LOAD "CAS:BMP280"` with `wav/pc1600_bmp280-v1.1_mode0_CE-1600P.wav` (about 3 minutes each).
 These recordings are ASCII BASIC files made by `tools/pc1600_cas_bas2wav.py` (the tool of the
 [Software UART repository](https://github.com/Ante1000/Sharp_PC-1600_Software_UART/tree/main/tools));
-like the tool, they were only checked with its decoder, **not on a real PC-1600**.
+like the tool, they were only checked with its decoder (the decoded text equals the program), **not on a real PC-1600**.
 
 **With only a CE-150 (MODE 1, PC-1500 tape format):**
 
 Without a CE-1600P the programs can be loaded through a CE-150 exactly as the Saver/Loader of
 [SerComet](https://github.com/Ante1000/SerComet_transfer_tool_for_pockets/tree/main/Saver-Loader/PC-1600):
-switch the PC-1600 to **MODE 1**, play `wav/pc1600_i2c_installer-v1.0_mode1_CE-150.wav` into the CE-150 and `CLOAD`
+switch the PC-1600 to **MODE 1**, play `wav/pc1600_i2c_installer-v1.1_mode1_CE-150.wav` into the CE-150 and `CLOAD`
 it, switch back to **MODE 0** and `RUN` it (the program stays in memory; its machine code is for the
-Z80 of MODE 0). Reserve the machine-language area first with `NEW "S0:",&1000`; after the
-installer has run, repeat `NEW "S0:",&1000` in MODE 0, switch to MODE 1, `CLOAD` the BMP280 program
-(`wav/pc1600_bmp280-v1.0_mode1_CE-150.wav`) and go back to MODE 0.
+Z80 of MODE 0). Reserve the machine-language area first with `NEW0` and `NEW "S0:",&800`; after the
+installer has run, repeat `NEW "S0:",&800` in MODE 0, switch to MODE 1, `CLOAD` the BMP280 program
+(`wav/pc1600_bmp280-v1.1_mode1_CE-150.wav`) and go back to MODE 0.
 
 The recordings are made with `tools/pc1600_bas2wav.py program.txt out.wav NAME`: it tokenizes the
 program with the PC-1600 token table (the tokenizer of SerComet, ported to Python) and writes the tape
@@ -242,7 +238,7 @@ keeps **pins 29 (SCL) and 27 (SDA read)** and drives SDA with **pin 15 (PU)** in
 | speed | about 35 kHz (simulator) | about 20 kHz (estimate from the cycle counts, **not simulated**) |
 
 Both can be installed at the same time (their memory does not overlap): installer
-`Basic/pc1600_i2c_lh_installer-v1.0.txt` (`NEW "S0:",&1000` first), program `Basic/pc1600_bmp280_lh-v1.0.txt`,
+`Basic/archive/pc1600_i2c_lh_installer-v1.0.txt` (`NEW "S0:",&1000` first), program `Basic/archive/pc1600_bmp280_lh-v1.0.txt`,
 which is the Z80 BMP280 program with the addresses and `XCALL` changed (it prints the I2C speed in the
 same way, so the two drivers can be compared on the same sensor).
 The LH source was assembled with `tools/lh5801asm_mini.py`, which reproduces the listing of the PC-1500 v1.4
@@ -254,10 +250,10 @@ use it without memory cards for now); the interrupts of the LH-5803 are not swit
 ## Combined programs (driver + BMP280 in one file)
 
 For a quick start there is one BASIC program per driver that contains the machine code (in `DATA`
-lines from 4000) and the BMP280 program: `Basic/pc1600_i2c_z80_bmp280-v1.0.txt` (Z80 driver) and
-`Basic/pc1600_i2c_lh_bmp280-v1.0.txt` (LH-5803 driver; SDA diode on pin 15). Tape recordings
-(MODE 0, CE-1600P): `wav/pc1600_i2c_z80_bmp280-v1.0_mode0_CE-1600P.wav` (tape name `BMPZ80`, about 4.5 minutes) and
-`wav/pc1600_i2c_lh_bmp280-v1.0_mode0_CE-1600P.wav` (`BMPLH`, about 4 minutes).
+lines from 4000) and the BMP280 program: `Basic/archive/pc1600_i2c_z80_bmp280-v1.0.txt` (Z80 driver) and
+`Basic/archive/pc1600_i2c_lh_bmp280-v1.0.txt` (LH-5803 driver; SDA diode on pin 15). Tape recordings
+(MODE 0, CE-1600P): `wav/archive/pc1600_i2c_z80_bmp280-v1.0_mode0_CE-1600P.wav` (tape name `BMPZ80`, about 4.5 minutes) and
+`wav/archive/pc1600_i2c_lh_bmp280-v1.0_mode0_CE-1600P.wav` (`BMPLH`, about 4 minutes).
 
 1. `NEW "S0:",&1000` (reserves the machine-language area; without it the code would overwrite the
    BASIC program). On the first run the program shows where it starts and asks `DID YOU TYPE NEW S0 (Y)`:
@@ -272,7 +268,7 @@ The files are made by `tools/make_combined.py` from the assembler sources and th
 
 ## LH diagnostic program
 
-`Basic/pc1600_i2c_lh_diag-v1.0.txt` (tape `wav/pc1600_i2c_lh_diag-v1.0_mode0_CE-1600P.wav`, name `DIAGLH`,
+`Basic/archive/pc1600_i2c_lh_diag-v1.0.txt` (tape `wav/archive/pc1600_i2c_lh_diag-v1.0_mode0_CE-1600P.wav`, name `DIAGLH`,
 source `asm/i2c_lh_diag_v1.0.asm`) checks the three lines of the LH driver step by step and prints numbered
 findings. Use it with the SDA diode on **pin 15 only** (pin 31 disconnected), after `NEW "S0:",&1000`:
 
@@ -300,7 +296,7 @@ The speed lab (below) produced a faster Z80 driver, **v1.1** (`asm/i2c_z80_v1.1.
 |---|---|
 | `Basic/pc1600_i2c_installer-v1.1.txt` | installer, scanner (`RUN 500`) and test (`RUN 700`) for v1.1 |
 | `Basic/pc1600_bmp280-v1.1.txt` | the BMP280 program for v1.1; its speed meter now uses the routine `REP` of the driver (10 reads per `CALL`) and subtracts the time of an empty `CALL`, so it shows the real SCL speed (takes about 25 s) |
-| `Basic/pc1600_i2c_z80_bmp280-v1.1.txt` | both in one file (about 2.4 KB of memory stay free) |
+| `Basic/archive/pc1600_i2c_z80_bmp280-v1.1.txt` | both in one file (about 2.4 KB of memory stay free) |
 
 `tools/make_v11.py` builds them (`--check` compares the DATA lines with the assembler). Review of v1.1 (after the first measurements): the one finding was in the entry code, which reads the interrupt flag with `LD A,I`. On an NMOS Z80 an interrupt that arrives
 during that instruction gives P/V = 0 although the interrupts are enabled; the driver would then not execute `EI` at the exit and BASIC would go on with the interrupts off (the clock
@@ -314,11 +310,11 @@ Five BASIC programs install the Z80 driver and measure how fast it really is, on
 
 | File | Versions | Measurement | Free memory after `NEW "S0:",&800` |
 |---|---|---|---|
-| `Basic/pc1600_z80_speedlab-v2.1_V0-V3.txt` | V0, V1, V2, V3 | old (10 s window, 1 transfer per call) | about 2.9 KB |
-| `Basic/pc1600_z80_speedlab-v2.2_V4-V5.txt` | V4, V5 | **accurate** | about 2.4 KB |
-| `Basic/pc1600_z80_speedlab-v2.2_V6-V7.txt` | V6, V7 | **accurate** | about 2.4 KB |
-| `Basic/pc1600_z80_speedlab-v2.2_V8-V9.txt` | V8, V9 | **accurate** | about 2.5 KB |
-| `Basic/pc1600_z80_speedlab-v2.2_V10.txt` | V10 | **accurate** | about 4 KB |
+| `Basic/archive/pc1600_z80_speedlab-v2.1_V0-V3.txt` | V0, V1, V2, V3 | old (10 s window, 1 transfer per call) | about 2.9 KB |
+| `Basic/archive/pc1600_z80_speedlab-v2.2_V4-V5.txt` | V4, V5 | **accurate** | about 2.4 KB |
+| `Basic/archive/pc1600_z80_speedlab-v2.2_V6-V7.txt` | V6, V7 | **accurate** | about 2.4 KB |
+| `Basic/archive/pc1600_z80_speedlab-v2.2_V8-V9.txt` | V8, V9 | **accurate** | about 2.5 KB |
+| `Basic/archive/pc1600_z80_speedlab-v2.2_V10.txt` | V10 | **accurate** | about 4 KB |
 
 Each program verifies every version on the BMP280 (chip ID, a signature of the 24 calibration bytes, a write + read-back of the
 config register with three bit patterns) before it times it, and prints `TRY Vn` first, so a version that hangs the machine can be recognised.
@@ -378,7 +374,7 @@ The sources are `asm/i2c_z80_lab_v0.asm` to `_v7.asm`, generated by `tools/make_
 
 The old noisy numbers (V3 34/34 ... V7 43/35) are obsolete. Analysis:
 
-- **The port lab** (`Basic/pc1600_z80_portlab-v1.0.txt`, run on the real machine) gave: BASIC `CALL` 301 to 306 ms; `NOP` (routine with its loop) 1.87 to 2.06 us;
+- **The port lab** (`Basic/archive/pc1600_z80_portlab-v1.0.txt`, run on the real machine) gave: BASIC `CALL` 301 to 306 ms; `NOP` (routine with its loop) 1.87 to 2.06 us;
   `OUT (n),A` 4.078 us; `IN A,(n)` 4.078 us; `OUT (C),r` and `IN r,(C)` 4.664 us, for **all ports 18H to 1FH and for B = 00, 01, 81**.
   So a port read is **not** slower than a write, the port and the high address byte do not matter, and an ideal 3.58 MHz Z80 would need
   1.57 / 3.52 / 3.80 us. (An earlier guess in this file, "IN costs 28 T", was wrong: it only mimicked the real effect.)
@@ -469,19 +465,16 @@ compared with the real machine.
 
 | File | Contents |
 |---|---|
-| `asm/i2c_z80_v1.0.asm`, `.lst` | Z80 source with the explanation, and the listing with the bytes |
-| `asm/i2c_z80_v1.1.asm`, `.lst` | the faster Z80 driver v1.1 (see "Driver version 1.1") |
-| `Basic/pc1600_i2c_installer-v1.0.txt` | BASIC installer, scanner and test |
-| `Basic/pc1600_z80_portlab-v1.0.txt` | times `NOP`, `OUT`, `IN` on the real machine (port lab) |
-| `Basic/pc1600_bmp280-v1.0.txt` | thermometer and barometer with a BMP280 (address &77) that also shows the approximate I2C speed, see below |
-| `wav/*_mode0_CE-1600P.wav` | the installer (`I2CZ80`) and the BMP280 program (`BMP280`) as tape recordings in the PC-1600 format (MODE 0, `LOAD "CAS:NAME"`) |
-| `wav/*_mode1_CE-150.wav` | the same programs in the PC-1500 / CE-150 format (MODE 1, `CLOAD`) |
-| `asm/i2c_lh_v1.0.asm`, `.lst`, `Basic/pc1600_i2c_lh_installer-v1.0.txt`, `Basic/pc1600_bmp280_lh-v1.0.txt` | the LH-5803 variant (PC-1500 driver adapted, `XCALL`), its installer and BMP280 program, for comparison with the Z80 driver, see below |
-| `Basic/pc1600_i2c_z80_bmp280-v1.0.txt`, `Basic/pc1600_i2c_lh_bmp280-v1.0.txt` | **combined programs**: the driver installer and the BMP280 program in one BASIC file (Z80 driver / LH-5803 driver), see below |
-| `wav/pc1600_i2c_z80_bmp280-v1.0_mode0_CE-1600P.wav`, `wav/pc1600_i2c_lh_bmp280-v1.0_mode0_CE-1600P.wav` | the two combined programs for `LOAD "CAS:BMPZ80"` / `"CAS:BMPLH"` (MODE 0, CE-1600P) |
-| `wav/*` | the four programs as tape recordings: `_mode1_CE-150.wav` (PC-1500 format, `CLOAD` in MODE 1) and `_mode0_CE-1600P.wav` (PC-1600 format, `LOAD "CAS:NAME"`) |
-| `Basic/pc1600_z80_speedlab-v2.1_V*.txt`, `asm/i2c_z80_lab_v*.asm` | the Z80 **speed lab**: installer, port benchmark, speed ladder V0-V7 in three programs, verified on the BMP280, see below |
-| `tools/` | mini assemblers (Z80 and LH5801), simulator with the tests, installer generators, simulator with the tests, installer generator, `pc1600_bas2wav.py` (BASIC text to a MODE 1 / CE-150 recording), `pc1600_cas_bas2wav.py` (to a MODE 0 / CE-1600P recording, from the Software UART repository) |
+| `Basic/pc1600_i2c_installer-v1.1.txt` | **BASIC installer** of the driver v1.1, scanner (`RUN 500`) and test (`RUN 700`) |
+| `Basic/pc1600_bmp280-v1.1.txt` | **thermometer and barometer** with a BMP280 (address &77), shows the I2C speed; needs the installed driver |
+| `wav/pc1600_*-v1.1_mode0_CE-1600P.wav` | the two programs as recordings in the PC-1600 format (MODE 0, `LOAD "CAS:I2CZ80"` / `"CAS:BMP280"`) |
+| `wav/pc1600_*-v1.1_mode1_CE-150.wav` | the same programs in the PC-1500 / CE-150 format (MODE 1, `CLOAD`) |
+| `asm/i2c_z80_v1.1.asm`, `.lst` | the Z80 driver v1.1 (source and listing) |
+| `asm/i2c_z80_v1.0.asm`, `.lst` | the first driver v1.0 with the long explanation of the method |
+| `asm/i2c_z80_lab_v0.asm` ... `_v10.asm` | the speed lab versions (V10 = v1.1) |
+| `asm/i2c_lh_v1.0.asm`, `asm/i2c_lh_diag_v1.0.asm` | the LH-5803 variant and its diagnostic (comparison) |
+| `Basic/archive/`, `wav/archive/` | everything older: v1.0 installer and BMP280 program, the combined programs (driver + BMP280 in one file, v1.0 and v1.1), the LH-5803 programs, the speed lab programs and the port lab, with their recordings |
+| `tools/` | mini assemblers (Z80 and LH5801), simulator with the tests (`--real` = wait states of the real machine), generators of all BASIC files (`make_v11.py`, `make_installer.py`, `make_combined.py`, `make_lab.py`, `make_portlab.py`, ...), `pc1600_bas2wav.py` (BASIC text to a MODE 1 / CE-150 recording), `pc1600_cas_bas2wav.py` (to a MODE 0 / CE-1600P recording, from the Software UART repository) |
 | `docs/design_notes.md` | analysis: pins, registers, alternatives that were considered |
 
 ## Sources

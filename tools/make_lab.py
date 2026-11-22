@@ -248,7 +248,7 @@ def write_sources():
 
 
 
-BAS_DIR = os.path.join(ROOT, 'Basic')
+BAS_DIR = os.path.join(ROOT, 'Basic', 'archive')
 
 # the program text of the last known good version 1.2 (decimal DATA, no markers, no START AT V),
 # with the ladder range and the first (base) version as parameters

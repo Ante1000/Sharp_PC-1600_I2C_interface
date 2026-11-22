@@ -10,7 +10,7 @@ sys.path.insert(0, here)
 from lh5801asm_mini import Asm
 
 ASM = os.path.join(here, '..', 'asm', 'i2c_lh_diag_v1.0.asm')
-OUT = os.path.join(here, '..', 'Basic', 'pc1600_i2c_lh_diag-v1.0.txt')
+OUT = os.path.join(here, '..', 'Basic', 'archive', 'pc1600_i2c_lh_diag-v1.0.txt')
 Z80_BASE = 0x8000 + 0x4D00
 
 PROG = [

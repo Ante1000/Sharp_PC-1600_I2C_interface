@@ -2,7 +2,7 @@
 """Builds the BASIC files of the Z80 driver v1.1 (= speed lab version V10):
   Basic/pc1600_i2c_installer-v1.1.txt         driver installer + scanner + test
   Basic/pc1600_bmp280-v1.1.txt                BMP280 program (needs the driver v1.1)
-  Basic/pc1600_i2c_z80_bmp280-v1.1.txt        installer and BMP280 program in one file
+  Basic/archive/pc1600_i2c_z80_bmp280-v1.1.txt  installer and BMP280 program in one file (archived)
 --check compares the DATA lines with the assembler output (asm/i2c_z80_v1.1.asm)."""
 import os
 import re
@@ -16,6 +16,7 @@ from z80asm_mini import Assembler
 
 ASM = os.path.join(here, '..', 'asm', 'i2c_z80_v1.1.asm')
 B = os.path.join(here, '..', 'Basic')
+BA = os.path.join(B, 'archive')
 RES = '&800'                     # C0C5-C7FF is enough for v1.1
 
 
@@ -55,7 +56,7 @@ CALLS = [
 
 
 def bmp280():
-    t = open(os.path.join(B, 'pc1600_bmp280-v1.0.txt')).read()
+    t = open(os.path.join(BA, 'pc1600_bmp280-v1.0.txt')).read()
     t = t.replace('NEEDS Z80 I2C V1.0 AT &C400', 'NEEDS Z80 I2C V1.1 AT &C400')
     lines = [l for l in t.splitlines() if not re.match(r'^(1000|10[1-9]\d) ', l)]
     i = next(k for k, l in enumerate(lines) if l.startswith('1100 '))
@@ -81,7 +82,7 @@ def targets():
 if __name__ == '__main__':
     bad = 0
     for fn, text, img in targets():
-        path = os.path.join(B, fn)
+        path = os.path.join(BA if 'z80_bmp280' in fn else B, fn)
         if '--check' in sys.argv:
             t = open(path).read()
             ok = t == text and (img is None or MC.parse_back(t) == img)

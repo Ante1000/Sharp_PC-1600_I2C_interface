@@ -11,7 +11,7 @@ sys.path.insert(0, here)
 from lh5801asm_mini import Asm
 
 ASM = os.path.join(here, '..', 'asm', 'i2c_lh_v1.0.asm')
-OUT = os.path.join(here, '..', 'Basic', 'pc1600_i2c_lh_installer-v1.0.txt')
+OUT = os.path.join(here, '..', 'Basic', 'archive', 'pc1600_i2c_lh_installer-v1.0.txt')
 CONSTS = {'IP': 0x4C, 'TP': 0x4B, 'RP': 0x4A, 'BM': 4, 'DB': 0xFB}
 Z80_BASE = 0x8000 + 0x4C00     # Z80 address of the first byte of the code
 PER_LINE = 10

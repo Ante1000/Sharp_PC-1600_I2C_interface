@@ -15,7 +15,7 @@ sys.path.insert(0, here)
 from z80asm_mini import Assembler
 
 ROOT = os.path.join(here, '..')
-OUTF = os.path.join(ROOT, 'Basic', 'pc1600_z80_portlab-v1.0.txt')
+OUTF = os.path.join(ROOT, 'Basic', 'archive', 'pc1600_z80_portlab-v1.0.txt')
 BASE, STEP = 0xC100, 0x30
 OUTER = 100
 

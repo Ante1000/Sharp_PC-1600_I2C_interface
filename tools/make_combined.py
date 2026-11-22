@@ -15,7 +15,7 @@ from z80asm_mini import Assembler
 from lh5801asm_mini import Asm
 import make_installer_lh as LH
 
-B = os.path.join(here, '..', 'Basic')
+B = os.path.join(here, '..', 'Basic', 'archive')
 Z80_ASM = os.path.join(here, '..', 'asm', 'i2c_z80_v1.0.asm')
 
 SUB = [

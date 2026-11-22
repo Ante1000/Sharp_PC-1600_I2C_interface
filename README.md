@@ -196,15 +196,24 @@ approximate **effective** value, a few percent below the real SCL frequency beca
 BASIC statements between the reads. It is measured at the start, and again when you press **S**
 during the measurement loop (any other key stops the program).
 
-## Loading from tape (CE-150, PC-1500 tape format)
+## Loading from tape
+
+**With a CE-1600P or CE-152 (MODE 0, PC-1600 tape format):** play `wav/pc1600_i2c_installer-v1.0_mode0_CE-1600P.wav` and
+`LOAD "CAS:I2CZ80"` (after `NEW "S0:",&1000`), `RUN`; later `NEW "S0:",&1000` again and
+`LOAD "CAS:BMP280"` with `wav/pc1600_bmp280-v1.0_mode0_CE-1600P.wav` (about 2 to 3 minutes each).
+These recordings are ASCII BASIC files made by `tools/pc1600_cas_bas2wav.py` (the tool of the
+[Software UART repository](https://github.com/Ante1000/Sharp_PC-1600_Software_UART/tree/main/tools));
+like the tool, they were only checked with its decoder, **not on a real PC-1600**.
+
+**With only a CE-150 (MODE 1, PC-1500 tape format):**
 
 Without a CE-1600P the programs can be loaded through a CE-150 exactly as the Saver/Loader of
 [SerComet](https://github.com/Ante1000/SerComet_transfer_tool_for_pockets/tree/main/Saver-Loader/PC-1600):
-switch the PC-1600 to **MODE 1**, play `wav/pc1600_i2c_installer-v1.0.wav` into the CE-150 and `CLOAD`
+switch the PC-1600 to **MODE 1**, play `wav/pc1600_i2c_installer-v1.0_mode1_CE-150.wav` into the CE-150 and `CLOAD`
 it, switch back to **MODE 0** and `RUN` it (the program stays in memory; its machine code is for the
 Z80 of MODE 0). Reserve the machine-language area first with `NEW "S0:",&1000`; after the
 installer has run, repeat `NEW "S0:",&1000` in MODE 0, switch to MODE 1, `CLOAD` the BMP280 program
-(`wav/pc1600_bmp280-v1.0.wav`) and go back to MODE 0.
+(`wav/pc1600_bmp280-v1.0_mode1_CE-150.wav`) and go back to MODE 0.
 
 The recordings are made with `tools/pc1600_bas2wav.py program.txt out.wav NAME`: it tokenizes the
 program with the PC-1600 token table (the tokenizer of SerComet, ported to Python) and writes the tape
@@ -279,8 +288,9 @@ compared with the real machine.
 | `asm/i2c_z80_v1.0.asm`, `.lst` | Z80 source with the explanation, and the listing with the bytes |
 | `Basic/pc1600_i2c_installer-v1.0.txt` | BASIC installer, scanner and test |
 | `Basic/pc1600_bmp280-v1.0.txt` | thermometer and barometer with a BMP280 (address &77) that also shows the approximate I2C speed, see below |
-| `wav/pc1600_i2c_installer-v1.0.wav`, `wav/pc1600_bmp280-v1.0.wav` | the installer (tape name `I2CZ80`) and the BMP280 program (`BMP280`) as tape recordings in the PC-1500 / CE-150 format, see below |
-| `tools/` | mini assembler, simulator with the tests, installer generator, `pc1600_bas2wav.py` (BASIC text to tape recording) |
+| `wav/*_mode0_CE-1600P.wav` | the installer (`I2CZ80`) and the BMP280 program (`BMP280`) as tape recordings in the PC-1600 format (MODE 0, `LOAD "CAS:NAME"`) |
+| `wav/*_mode1_CE-150.wav` | the same programs in the PC-1500 / CE-150 format (MODE 1, `CLOAD`) |
+| `tools/` | mini assembler, simulator with the tests, installer generator, `pc1600_bas2wav.py` (BASIC text to a MODE 1 / CE-150 recording), `pc1600_cas_bas2wav.py` (to a MODE 0 / CE-1600P recording, from the Software UART repository) |
 | `docs/design_notes.md` | analysis: pins, registers, alternatives that were considered |
 
 ## Sources

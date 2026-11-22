@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generates the speed-lab drivers asm/i2c_z80_lab_v0.asm, _v1.asm, _v2.asm (same entry points and
-main code, three versions of the bit loops) and the BASIC program Basic/pc1600_z80_speedlab-v1.6.txt.
+main code, three versions of the bit loops) and the BASIC program Basic/pc1600_z80_speedlab-v2.0.txt.
 
 V0: the loops of the driver v1.0 (a NOP in every clock, 3 port accesses and register copies when reading)
 V1: V0 without the NOPs, and a shorter receive loop (no register copies)
@@ -155,14 +155,14 @@ def write_sources():
 
 
 
-BAS = os.path.join(ROOT, 'Basic', 'pc1600_z80_speedlab-v1.6.txt')
+BAS = os.path.join(ROOT, 'Basic', 'pc1600_z80_speedlab-v2.0.txt')
 
 PROG = [
-    '10 REM *** PC-1600 Z80 I2C SPEED LAB V1.6 (INSTALLER+SPEED+BMP280 TEST) ***',
-    '20 REM FIRST: NEW "S0:",&800. BMP280 AT &77. SDA DIODE ON PIN 31 (Z80)',
+    '10 REM *** PC-1600 Z80 I2C SPEED LAB V2.0 (INSTALLER+SPEED+BMP280 TEST) ***',
+    '20 REM FIRST: NEW "S0:",&800 (NOT NEW0!). BMP280 AT &77. SDA DIODE ON PIN 31',
     '30 CLEAR : WAIT 0 : D = &77 : IC = &C400 : IA = &C5FC : TX = &C700 : RX = &C600',
     '40 IF PEEK (&C500) <> 243 THEN GOSUB 3500',
-    '45 PRINT "Installing V3..."',
+    '45 PRINT "Installing V0..."',
     '46 RESTORE 4000',
     '47 GOSUB 2000',
     '48 PRINT "Clearing TX..."',
@@ -173,9 +173,9 @@ PROG = [
     '55 FOR J = 0 TO 2 : A = 50432 + J * 32 : GOSUB 1800',
     '60 U = (H / N - OV) * 1000000 / 2560 : T$ = MID$ ("OUT IN  NOP ", J * 4 + 1, 4)',
     '65 PRINT T$; INT (U * 100 + .5) / 100; " us" : NEXT J',
-    '96 F0 = 3 : INPUT "START AT V (3-7, ENTER=3)"; F0',
-    '100 R0 = 0 : FOR V = 3 TO 7',
-    '110 IF V > 3 THEN GOSUB 2000',
+    '96 F0 = 0 : INPUT "START AT V (0-7, ENTER=0)"; F0',
+    '100 R0 = 0 : FOR V = 0 TO 7',
+    '110 IF V > 0 THEN GOSUB 2000',
     '112 IF V < F0 THEN 190',
     '120 WAIT 64 : PRINT "TRY V"; V : WAIT 128',
     '130 GOSUB 1500',
@@ -236,7 +236,7 @@ PROG = [
     '3510 H = PEEK (63589) : H = H + 128 - 256 * INT (H / 128)',
     '3512 S = H * 256 + PEEK (63590)',
     '3520 PRINT "PROGRAM AT "; S; " (&C800 = 51200)"',
-    '3522 INPUT "DID YOU TYPE NEW S0 &800 (Y)"; A$ : IF A$ <> "Y" THEN END',
+    '3522 INPUT "NEW S0:,&800 TYPED, NOT NEW0 (Y)"; A$ : IF A$ <> "Y" THEN END',
     '3530 RETURN',
 ]
 
@@ -269,11 +269,11 @@ def diff_segments(mem, image, gap=3):
 
 
 def build_basic():
-    imgs = [asm_of(v) for v in range(3, 8)]          # V3 (base) .. V7
+    imgs = [asm_of(v) for v in range(8)]          # V0 (base) .. V7
     lines = list(PROG)
     lines += data_lines(4000, imgs[0].segments())
     mem = dict(imgs[0].image)
-    for k in range(1, 5):
+    for k in range(1, 8):
         lines += data_lines(4000 + 1000 * k, diff_segments(mem, imgs[k].image))
     return '\n'.join(lines) + '\n', imgs
 
@@ -303,7 +303,7 @@ if __name__ == '__main__':
         blocks = parse_blocks(t)
         mem = dict(blocks[4000])
         oks = [mem == dict(imgs[0].image)]
-        for k in range(1, 5):
+        for k in range(1, 8):
             mem.update(blocks[4000 + 1000 * k])
             oks.append(all(mem.get(a_) == v for a_, v in imgs[k].image.items()))
         longest = max(len(l) for l in t.splitlines())

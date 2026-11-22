@@ -119,6 +119,8 @@ class Assembler:
         if mn == 'CALL' and n == 1: return [0xCD] + list(imm16(ops[0]).to_bytes(2, 'little'))
         if mn == 'OUT' and n == 2 and up[0] == '(C)' and up[1] in R8:
             return [0xED, 0x41 + 8 * R8[up[1]]]
+        if mn == 'IN' and n == 2 and up[0] in R8 and up[1] == '(C)':
+            return [0xED, 0x40 + 8 * R8[up[0]]]
         if mn == 'CP' and n == 1 and up[0] in R8:
             return [0xB8 + R8[up[0]]]
         if mn == 'OUT' and n == 2 and up[1] == 'A' and ops[0].startswith('('):

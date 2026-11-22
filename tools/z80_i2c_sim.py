@@ -203,6 +203,8 @@ class Hub:
 class Z80:
     S, Z, H, PV, N, C = 0x80, 0x40, 0x10, 0x04, 0x02, 0x01
     IOW = 0   # extra wait states in an I/O cycle (the Z80 inserts one itself: 4 T)
+    IOWIN = 0   # additional wait states of IN only (the real PB port is slow to read)
+    IOWOUT = 0  # additional wait states of OUT only
 
     def __init__(self, hub):
         self.hub = hub
@@ -261,7 +263,7 @@ class Z80:
         return lo | (hi << 8)
 
     def io_out(self, hi, port, v):
-        self.seg(hi & 1, 3 + self.IOW)      # T1, T2, Tw
+        self.seg(hi & 1, 3 + self.IOW + self.IOWOUT)      # T1, T2, Tw
         # the write strobe: the data are valid from here
         if port == 0x18:
             self.hub.set_scl(self.t, (v >> 7) & 1)
@@ -271,7 +273,7 @@ class Z80:
         self.seg(hi & 1, 1)                 # T3
 
     def io_in(self, hi, port):
-        self.seg(hi & 1, 3 + self.IOW)
+        self.seg(hi & 1, 3 + self.IOW + self.IOWIN)
         if port == 0x1F:
             v = 0x6B | (self.hub.read_sda() << 2)
         elif port == 0x1D:
@@ -386,6 +388,11 @@ class Z80:
             if op2 & 0xC7 == 0x41:      # OUT (C),r
                 r = self.RN[(op2 >> 3) & 7]
                 self.io_out(R['B'], R['C'], R[r])
+                return
+            if op2 & 0xC7 == 0x40 and op2 != 0x70:      # IN r,(C)
+                r = self.RN[(op2 >> 3) & 7]
+                R[r] = self.io_in(R['B'], R['C'])
+                self.F = (self.F & self.C) | self.szp(R[r])
                 return
             if op2 in (0x47, 0x57):
                 self.hold(1)            # LD I,A / LD A,I: one more T-state after the refresh
@@ -841,6 +848,12 @@ if __name__ == '__main__':
         if arg.startswith('--iow='):
             Z80.IOW = int(arg.split('=')[1])
             print('extra I/O wait states: %d' % Z80.IOW)
+        elif arg.startswith('--iowin='):
+            Z80.IOWIN = int(arg.split('=')[1])
+            print('extra wait states of IN: %d' % Z80.IOWIN)
+        elif arg.startswith('--iowout='):
+            Z80.IOWOUT = int(arg.split('=')[1])
+            print('extra wait states of OUT: %d' % Z80.IOWOUT)
         elif arg.startswith('--asm='):
             ASM_PATH = arg.split('=', 1)[1]
             print('source:', ASM_PATH)

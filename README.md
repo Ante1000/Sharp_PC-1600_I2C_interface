@@ -302,6 +302,9 @@ and its variables (hangs, returns to BASIC, errors 10 and 19 in the earlier test
 (3 to 7): the DATA blocks of the earlier versions are still installed silently, but only the versions from the chosen one are tested.
 After a freeze reset the PC-1600 **and switch the BMP280 supply off and on**: the sensor may be left in the middle of a transfer.
 
+**The last known good file** (it ran V0 to V3 on the real PC-1600 with `NEW "S0:",&800`) is kept unchanged in `Basic/archive/pc1600_z80_speedlab-v1.2.txt`.
+If version 2.0 hangs, run that file: if it works, the difference is in the new program text (hex DATA reader, `START AT V`), if it hangs too, it is the machine or the wiring.
+
 **Measuring method.** The BASIC `CALL` statement itself is slow (83 ms per call on the real PC-1600), so the program first times
 an empty routine (`RET`) in the same loop, and subtracts that overhead; each timing takes 10 s with one `CALL` per `TIME` read.
 The result line is `Vn OK R <kHz> W <kHz>` (read and write of 255 bytes; the write test sends 255 zero bytes, which the BMP280

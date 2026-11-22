@@ -400,3 +400,5 @@ C54C  00                   NOP
 C54D  10 F4                DJNZ BN1
 C54F  FB                   EI
 C550  C9                   RET
+                          ORG 0C560h
+C560  C9           BR:     RET                     ; empty routine: measures the time of the BASIC CALL itself

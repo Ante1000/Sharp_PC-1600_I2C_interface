@@ -400,3 +400,5 @@ BN1:
         DJNZ BN1
         EI
         RET
+        ORG 0C560h
+BR:     RET                     ; empty routine: measures the time of the BASIC CALL itself

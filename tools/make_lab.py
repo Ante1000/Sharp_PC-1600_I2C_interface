@@ -238,23 +238,30 @@ def data_lines(first, segs, per=10):
     return out
 
 
-def clip(a, lo, hi):
+def diff_segments(mem, image, gap=3):
+    """Runs of bytes of `image` that differ from the memory `mem` (a dict, updated); runs closer than `gap` are joined."""
+    changed = sorted(a for a, v in image.items() if mem.get(a) != v)
     segs = []
-    for addr, data in a.segments():
-        keep = [(addr + i, b) for i, b in enumerate(data) if lo <= addr + i <= hi]
-        if keep:
-            segs.append((keep[0][0], [b for _, b in keep]))
-    return segs
+    for a in changed:
+        if segs and a - (segs[-1][0] + len(segs[-1][1])) <= gap:
+            start, data = segs[-1]
+            data.extend(image.get(x, mem.get(x, 0)) for x in range(start + len(data), a + 1))
+        else:
+            segs.append([a, [image[a]]])
+    for start, data in segs:
+        for i, v in enumerate(data):
+            mem[start + i] = v
+    return [(a_, d_) for a_, d_ in segs]
 
 
 def build_basic():
-    a0, a1, a2, a3 = asm_of(0), asm_of(1), asm_of(2), asm_of(3)
+    imgs = [asm_of(v) for v in range(4)]
     lines = list(PROG)
-    lines += data_lines(4000, a0.segments())
-    lines += data_lines(5000, clip(a1, 0xC100, 0xC2FF))
-    lines += data_lines(6000, clip(a2, 0xC100, 0xC2FF))
-    lines += data_lines(7000, clip(a3, 0xC100, 0xC3FF))
-    return '\n'.join(lines) + '\n', (a0, a1, a2, a3)
+    lines += data_lines(4000, imgs[0].segments())
+    mem = dict(imgs[0].image)
+    for k in range(1, 4):
+        lines += data_lines(4000 + 1000 * k, diff_segments(mem, imgs[k].image))
+    return '\n'.join(lines) + '\n', imgs
 
 
 def parse_blocks(text):
@@ -284,18 +291,19 @@ def parse_blocks(text):
 
 if __name__ == '__main__':
     write_sources()
-    text, (a0, a1, a2, a3) = build_basic()
+    text, imgs = build_basic()
     if '--check' in sys.argv:
         t = open(BAS).read()
         blocks = parse_blocks(t)
-        ok0 = blocks[4000] == dict(a0.image)
-        ok1 = all(a1.image.get(k) == v for k, v in blocks[5000].items())
-        ok2 = all(a2.image.get(k) == v for k, v in blocks[6000].items())
-        ok3 = all(a3.image.get(k) == v for k, v in blocks[7000].items())
+        mem = dict(blocks[4000])
+        oks = [mem == dict(imgs[0].image)]
+        for k in range(1, 4):
+            mem.update(blocks[4000 + 1000 * k])
+            oks.append(all(mem.get(a_) == v for a_, v in imgs[k].image.items()))
         longest = max(len(l) for l in t.splitlines())
         nums = [int(m.group(1)) for m in re.finditer(r'^(\d+) ', t, re.M)]
-        print('lab: base=V0 image %s, V1 patch %s, V2 patch %s, V3 patch %s | up to date %s | longest line %d | ascending %s'
-              % (ok0, ok1, ok2, ok3, t == text, longest, nums == sorted(set(nums))))
-        sys.exit(0 if ok0 and ok1 and ok2 and ok3 and t == text and longest <= 80 and nums == sorted(set(nums)) else 1)
+        print('lab: V0..V3 installed in order reproduce the assembler images %s | up to date %s | longest line %d | ascending %s'
+              % (oks, t == text, longest, nums == sorted(set(nums))))
+        sys.exit(0 if all(oks) and t == text and longest <= 80 and nums == sorted(set(nums)) else 1)
     open(BAS, 'w').write(text)
     print('written', BAS, len(text.splitlines()), 'lines')

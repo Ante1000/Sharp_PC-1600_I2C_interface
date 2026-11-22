@@ -784,7 +784,7 @@ def main():
     check('stuck forever: I and IFF restored', r['iok'] and r['iffok'])
 
     # port benchmark routines of the lab versions (BO = 2560 OUT, BI = 2560 IN, BN = 2560 NOP)
-    if 0xC500 in asm.image:
+    if 0xC520 in asm.image:
         for name, ad in (('BO', 0xC500), ('BI', 0xC520), ('BN', 0xC540)):
             hub = Hub(Slave(0x42))
             cpu = Z80(hub)
@@ -795,6 +795,32 @@ def main():
             if name == 'BO':
                 check('bench BO: 2560 OUT', cpu.opc_writes == 2560, cpu.opc_writes)
             print('bench %s: %.3f ms in the simulator' % (name, cpu.t * US / 1000))
+
+    # REP (C580): calls the driver K times (K at C5FA), stops at the first error, interrupts on afterwards
+    if 0xC580 in asm.image:
+        for dev, k, want_stops, want_res in ((0x42, 3, 3, 0), (0x27, 5, 1, 1)):
+            s = Slave(0x42, read_data=(0x11, 0x22))
+            hub = Hub(s)
+            cpu = Z80(hub)
+            for a_, b_ in asm.image.items():
+                cpu.mem[a_] = b_
+            cpu.mem[IA], cpu.mem[IW], cpu.mem[IR] = dev, 1, 2
+            cpu.mem[TX] = 0x88
+            cpu.mem[0xC5FA] = k
+            hub.scl = 0
+            hub.a8 = 1
+            cpu.lvl = 1
+            cpu.ddb = 0x04
+            cpu.I = 0x30
+            cpu.iff1 = cpu.iff2 = 1
+            cpu.call(0xC580)
+            stops = s.log.count('STOP')
+            check('REP dev %02X K=%d: %d STOP expected %d' % (dev, k, stops, want_stops), stops == want_stops, s.log)
+            check('REP: E = %d' % want_res, cpu.r['E'] == want_res, cpu.r['E'])
+            check('REP: interrupts on and I restored', cpu.iff1 == 1 and cpu.I == 0x30)
+            check('REP: memory counter used only outside SCL high', not cpu.mem_accesses_with_scl_high,
+                  cpu.mem_accesses_with_scl_high[:3])
+            print('REP dev %02X K=%d: %d transfers, %.2f ms in the simulator' % (dev, k, stops, cpu.t * US / 1000))
 
     # summary
     sts = [s for s in allstats if 'f_kHz_avg' in s]

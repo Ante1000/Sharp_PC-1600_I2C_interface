@@ -25,6 +25,8 @@ IR      EQU 0C5FEh
 IS      EQU 0C5FFh
 
 TXH     EQU 0C7h
+RPT     EQU 0C5FAh
+RCT     EQU 0C5F9h
         ORG 0C100h
 WH:     LD A,S_H1
         OUT (OPC),A
@@ -452,59 +454,28 @@ RECVB:  LD A,HV
 
 
 ; ---------------------------------------------------------------------
-; port benchmark: 2560 port accesses per call (BASIC times the calls with TIME)
+; C500: marker (the first byte, 243, tells the BASIC program that the driver is installed)
+; C560: empty routine (the time of the BASIC CALL itself is measured with it)
+; C580: REP, calls the driver (C400) K times (K = byte at C5FA), stops at an error. For the speed
+;       measurement: one BASIC CALL then lasts about one second and the BASIC overhead is small.
+;       The interrupts are NOT disabled here (the driver does it for each transfer and restores
+;       them), so the clock of BASIC (TIME) keeps running as in a normal program.
 ; ---------------------------------------------------------------------
         ORG 0C500h
-BO:     DI                      ; (the first byte, 243, marks the lab version)
-        LD A,S_L1
-        LD B,0
-BO1:
-        OUT (OPC),A
-        OUT (OPC),A
-        OUT (OPC),A
-        OUT (OPC),A
-        OUT (OPC),A
-        OUT (OPC),A
-        OUT (OPC),A
-        OUT (OPC),A
-        OUT (OPC),A
-        OUT (OPC),A
-        DJNZ BO1
-        EI
-        RET
-        ORG 0C520h
-BI:     DI
-        LD B,0
-BI1:
-        IN A,(PBP)
-        IN A,(PBP)
-        IN A,(PBP)
-        IN A,(PBP)
-        IN A,(PBP)
-        IN A,(PBP)
-        IN A,(PBP)
-        IN A,(PBP)
-        IN A,(PBP)
-        IN A,(PBP)
-        DJNZ BI1
-        EI
-        RET
-        ORG 0C540h
-BN:     DI
-        LD B,0
-BN1:
-        NOP
-        NOP
-        NOP
-        NOP
-        NOP
-        NOP
-        NOP
-        NOP
-        NOP
-        NOP
-        DJNZ BN1
+BO:     DI
         EI
         RET
         ORG 0C560h
-BR:     RET                     ; empty routine: measures the time of the BASIC CALL itself
+BR:     RET
+        ORG 0C580h
+REP:    LD A,(RPT)
+        LD (RCT),A
+RP1:    CALL IC
+        LD A,E                  ; IC returns the status in E
+        OR A
+        JR NZ,RP2
+        LD A,(RCT)
+        DEC A
+        LD (RCT),A
+        JR NZ,RP1
+RP2:    RET

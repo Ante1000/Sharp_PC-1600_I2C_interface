@@ -25,6 +25,8 @@
                   IS      EQU 0C5FFh
                   
                   TXH     EQU 0C7h
+                  RPT     EQU 0C5FAh
+                  RCT     EQU 0C5F9h
                           ORG 0C100h
 C100  3E 81        WH:     LD A,S_H1
 C102  D3 18                OUT (OPC),A
@@ -452,59 +454,28 @@ C4F2  C3 20 C1             JP RH
                   
                   
                   ; ---------------------------------------------------------------------
-                  ; port benchmark: 2560 port accesses per call (BASIC times the calls with TIME)
+                  ; C500: marker (the first byte, 243, tells the BASIC program that the driver is installed)
+                  ; C560: empty routine (the time of the BASIC CALL itself is measured with it)
+                  ; C580: REP, calls the driver (C400) K times (K = byte at C5FA), stops at an error. For the speed
+                  ;       measurement: one BASIC CALL then lasts about one second and the BASIC overhead is small.
+                  ;       The interrupts are NOT disabled here (the driver does it for each transfer and restores
+                  ;       them), so the clock of BASIC (TIME) keeps running as in a normal program.
                   ; ---------------------------------------------------------------------
                           ORG 0C500h
-C500  F3           BO:     DI                      ; (the first byte, 243, marks the lab version)
-C501  3E 01                LD A,S_L1
-C503  06 00                LD B,0
-                  BO1:
-C505  D3 18                OUT (OPC),A
-C507  D3 18                OUT (OPC),A
-C509  D3 18                OUT (OPC),A
-C50B  D3 18                OUT (OPC),A
-C50D  D3 18                OUT (OPC),A
-C50F  D3 18                OUT (OPC),A
-C511  D3 18                OUT (OPC),A
-C513  D3 18                OUT (OPC),A
-C515  D3 18                OUT (OPC),A
-C517  D3 18                OUT (OPC),A
-C519  10 EA                DJNZ BO1
-C51B  FB                   EI
-C51C  C9                   RET
-                          ORG 0C520h
-C520  F3           BI:     DI
-C521  06 00                LD B,0
-                  BI1:
-C523  DB 1F                IN A,(PBP)
-C525  DB 1F                IN A,(PBP)
-C527  DB 1F                IN A,(PBP)
-C529  DB 1F                IN A,(PBP)
-C52B  DB 1F                IN A,(PBP)
-C52D  DB 1F                IN A,(PBP)
-C52F  DB 1F                IN A,(PBP)
-C531  DB 1F                IN A,(PBP)
-C533  DB 1F                IN A,(PBP)
-C535  DB 1F                IN A,(PBP)
-C537  10 EA                DJNZ BI1
-C539  FB                   EI
-C53A  C9                   RET
-                          ORG 0C540h
-C540  F3           BN:     DI
-C541  06 00                LD B,0
-                  BN1:
-C543  00                   NOP
-C544  00                   NOP
-C545  00                   NOP
-C546  00                   NOP
-C547  00                   NOP
-C548  00                   NOP
-C549  00                   NOP
-C54A  00                   NOP
-C54B  00                   NOP
-C54C  00                   NOP
-C54D  10 F4                DJNZ BN1
-C54F  FB                   EI
-C550  C9                   RET
+C500  F3           BO:     DI
+C501  FB                   EI
+C502  C9                   RET
                           ORG 0C560h
-C560  C9           BR:     RET                     ; empty routine: measures the time of the BASIC CALL itself
+C560  C9           BR:     RET
+                          ORG 0C580h
+C580  3A FA C5     REP:    LD A,(RPT)
+C583  32 F9 C5             LD (RCT),A
+C586  CD 00 C4     RP1:    CALL IC
+C589  7B                   LD A,E                  ; IC returns the status in E
+C58A  B7                   OR A
+C58B  20 09                JR NZ,RP2
+C58D  3A F9 C5             LD A,(RCT)
+C590  3D                   DEC A
+C591  32 F9 C5             LD (RCT),A
+C594  20 F0                JR NZ,RP1
+C596  C9           RP2:    RET

@@ -269,6 +269,25 @@ lines from 4000) and the BMP280 program: `Basic/pc1600_i2c_z80_bmp280-v1.0.txt` 
 The files are made by `tools/make_combined.py` from the assembler sources and the BMP280 programs
 (`--check` compares the DATA lines with the assembler output). Like the other programs, **not yet tried on a real PC-1600**.
 
+## LH diagnostic program
+
+`Basic/pc1600_i2c_lh_diag-v1.0.txt` (tape `wav/pc1600_i2c_lh_diag-v1.0_mode0_CE-1600P.wav`, name `DIAGLH`,
+source `asm/i2c_lh_diag_v1.0.asm`) checks the three lines of the LH driver step by step and prints numbered
+findings. Use it with the SDA diode on **pin 15 only** (pin 31 disconnected), after `NEW "S0:",&1000`:
+
+| Message | Meaning |
+|---|---|
+| E1 DDB BIT 2 STAYS SET | PB2 stays an output: the read of SDA returns the latch |
+| E2 RPU: SDA NOT PULLED LOW | the diode on pin 15 does not pull SDA low (reversed, open, wrong pin) |
+| E3 SDA STAYS LOW AFTER SPU | something holds SDA low: a diode left on pin 31, the sensor, no pull-up |
+| E4 SDA TOO SLOW | SDA rises, but not within the time the driver waits (needs a delay) |
+| E5 SDA LOW AFTER 10 CLK | SDA is low after 10 SCL pulses: SCL does not reach the device or it holds SDA |
+| E6 START: SDA NOT LOW | START cannot pull SDA low with SCL high |
+| E7 STOP: SDA NOT HIGH | STOP cannot release SDA with SCL high |
+
+The last line gives the SDA rise time in microseconds (counts of about 25 us). `ALL OK` means all steps passed.
+Made by `tools/make_diag.py`; assembled with the checked LH assembler, **not tried on a real PC-1600**.
+
 ## Limitations
 
 - **Pin 29 (SDO) should be low when the computer is idle.** If it is high, the first

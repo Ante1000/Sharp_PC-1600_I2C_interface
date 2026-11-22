@@ -1,0 +1,113 @@
+                      ; =====================================================================
+                      ; I2C LH diagnostic v1.0 for the Sharp PC-1600 (LH-5803, XCALL &4D00)
+                      ; Checks the three lines of the LH driver (SCL pin 29, SDA read pin 27, SDA drive pin 15 = PU)
+                      ; step by step and stores the results in a table at LH &4DF0 (Z80 &CDF0); the BASIC program
+                      ; pc1600_i2c_lh_diag-v1.0.txt reads the table and prints numbered findings.
+                      ; Table: +0 DDB bit 2 still set (1 = bad)     +1 RPU pulled SDA low (1 = yes), +2 loops left
+                      ;        +3 SPU released SDA (1 = yes), +4 loops left   +5 SDA high right after SPU + SCL=1 (as the driver)
+                      ;        +6 SDA high after 10 SCL pulses      +7 START: SDA low after RPU with SCL = 1
+                      ;        +8 STOP: SDA high after SPU with SCL = 1, +9 loops left
+                      ; "loops left" = UL after the wait loop (255 = at once, small = slow, flag 0 = timeout).
+                      ; One wait loop pass is about 33 cycles (25 us).
+                      ; =====================================================================
+00  FD BE                  RIE
+02  48 F0                  LDI  XH,&F0
+04  4A 0F                  LDI  XL,&0F             ; X = &F00F (read SDA, bit 2)
+06  58 F0                  LDI  YH,&F0
+08  5A 08                  LDI  YL,&08             ; Y = &F008 (port C, SCL = bit 7)
+0A  FD E9 F0 0D FB         ANI  #(&F00D),&FB       ; DDB bit 2 = input
+0F  B5 00                  LDI  A,0
+11  FD ED F0 0D 04         BII  #(&F00D),4
+16  8B 02                  BZS+ DD
+18  B5 01                  LDI  A,1
+1A  AE 4D F0       DD:     STA  (&4DF0)            ; +0
+                      ;
+                      ; 1: RPU, SDA must go low
+1D  E3                     RPU
+1E  6A FF                  LDI  UL,255
+20  FD 4D 04       W1:     BII  #(X),4
+23  8B 09                  BZS+ G1
+25  88 07                  LOP  UL,W1
+27  B5 00                  LDI  A,0
+29  AE 4D F1               STA  (&4DF1)
+2C  8E 09                  BCH+ S2
+2E  24             G1:     LDA  UL
+2F  AE 4D F2               STA  (&4DF2)
+32  B5 01                  LDI  A,1
+34  AE 4D F1               STA  (&4DF1)
+                      ;
+                      ; 2: SPU, SDA must go high
+37  E1             S2:     SPU
+38  6A FF                  LDI  UL,255
+3A  FD 4D 04       W2:     BII  #(X),4
+3D  89 09                  BZR+ G2
+3F  88 07                  LOP  UL,W2
+41  B5 00                  LDI  A,0
+43  AE 4D F3               STA  (&4DF3)
+46  8E 09                  BCH+ S3
+48  24             G2:     LDA  UL
+49  AE 4D F4               STA  (&4DF4)
+4C  B5 01                  LDI  A,1
+4E  AE 4D F3               STA  (&4DF3)
+                      ;
+                      ; 3: as the driver starts: low for a while, then SPU, SCL = 1, one read at once
+51  E3             S3:     RPU
+52  6A FF                  LDI  UL,255
+54  88 02          D3:     LOP  UL,D3              ; about 1.5 ms: SDA is low
+56  E1                     SPU
+57  FD 5B 80               ORI  #(Y),&80           ; SCL = 1
+5A  6A 09                  LDI  UL,9
+5C  FD 4D 04               BII  #(X),4
+5F  89 04                  BZR+ H3
+61  B5 00                  LDI  A,0
+63  8E 02                  BCH+ P3
+65  B5 01          H3:     LDI  A,1
+67  AE 4D F5       P3:     STA  (&4DF5)
+                      ;
+                      ; 4: wait until SDA is high, then 10 SCL pulses with SDA released, read SDA
+6A  6A FF                  LDI  UL,255
+6C  FD 4D 04       W4:     BII  #(X),4
+6F  89 02                  BZR+ P4
+71  88 07                  LOP  UL,W4
+73  6A 09          P4:     LDI  UL,9
+75  FD 59 7F       L4:     ANI  #(Y),&7F
+78  FD 5B 80               ORI  #(Y),&80
+7B  88 08                  LOP  UL,L4
+7D  B5 00                  LDI  A,0
+7F  FD 4D 04               BII  #(X),4
+82  8B 02                  BZS+ S5
+84  B5 01                  LDI  A,1
+86  AE 4D F6       S5:     STA  (&4DF6)
+                      ;
+                      ; 5: START: SCL = 1, RPU: SDA must be low
+89  E3                     RPU
+8A  6A FF                  LDI  UL,255
+8C  FD 4D 04       W5:     BII  #(X),4
+8F  8B 06                  BZS+ G5
+91  88 07                  LOP  UL,W5
+93  B5 00                  LDI  A,0
+95  8E 02                  BCH+ P5
+97  B5 01          G5:     LDI  A,1
+99  AE 4D F7       P5:     STA  (&4DF7)
+9C  FD 59 7F               ANI  #(Y),&7F           ; SCL = 0
+                      ;
+                      ; 6: STOP: SCL = 1, SPU: SDA must go high
+9F  FD 5B 80               ORI  #(Y),&80
+A2  E1                     SPU
+A3  6A FF                  LDI  UL,255
+A5  FD 4D 04       W6:     BII  #(X),4
+A8  89 09                  BZR+ G6
+AA  88 07                  LOP  UL,W6
+AC  B5 00                  LDI  A,0
+AE  AE 4D F8               STA  (&4DF8)
+B1  8E 09                  BCH+ EX
+B3  24             G6:     LDA  UL
+B4  AE 4D F9               STA  (&4DF9)
+B7  B5 01                  LDI  A,1
+B9  AE 4D F8               STA  (&4DF8)
+BC  FD 59 7F       EX:     ANI  #(Y),&7F           ; SCL = 0
+BF  B5 00                  LDI  A,0
+C1  0A                     STA  XL
+C2  48 00                  LDI  XH,0
+C4  FB                     SEC
+C5  9A                     RTN

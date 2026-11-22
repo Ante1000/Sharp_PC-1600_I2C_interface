@@ -155,14 +155,16 @@ def write_sources():
 
 
 
-BAS = os.path.join(ROOT, 'Basic', 'pc1600_z80_speedlab-v2.0.txt')
+BAS_DIR = os.path.join(ROOT, 'Basic')
 
+# the program text of the last known good version 1.2 (decimal DATA, no markers, no START AT V),
+# with the ladder range and the first (base) version as parameters
 PROG = [
-    '10 REM *** PC-1600 Z80 I2C SPEED LAB V2.0 (INSTALLER+SPEED+BMP280 TEST) ***',
+    '10 REM *** PC-1600 Z80 I2C SPEED LAB %(ver)s (INSTALLER+SPEED+BMP280 TEST) ***',
     '20 REM FIRST: NEW "S0:",&800 (NOT NEW0!). BMP280 AT &77. SDA DIODE ON PIN 31',
     '30 CLEAR : WAIT 0 : D = &77 : IC = &C400 : IA = &C5FC : TX = &C700 : RX = &C600',
     '40 IF PEEK (&C500) <> 243 THEN GOSUB 3500',
-    '45 PRINT "Installing V0..."',
+    '45 PRINT "Installing V%(first)d..."',
     '46 RESTORE 4000',
     '47 GOSUB 2000',
     '48 PRINT "Clearing TX..."',
@@ -173,18 +175,15 @@ PROG = [
     '55 FOR J = 0 TO 2 : A = 50432 + J * 32 : GOSUB 1800',
     '60 U = (H / N - OV) * 1000000 / 2560 : T$ = MID$ ("OUT IN  NOP ", J * 4 + 1, 4)',
     '65 PRINT T$; INT (U * 100 + .5) / 100; " us" : NEXT J',
-    '96 F0 = 0 : INPUT "START AT V (0-7, ENTER=0)"; F0',
-    '100 R0 = 0 : FOR V = 0 TO 7',
-    '110 IF V > 0 THEN GOSUB 2000',
-    '112 IF V < F0 THEN 190',
+    '100 R0 = 0 : FOR V = %(first)d TO %(last)d',
+    '110 IF V > %(first)d THEN GOSUB 2000',
     '120 WAIT 64 : PRINT "TRY V"; V : WAIT 128',
     '130 GOSUB 1500',
     '140 IF F <> 0 AND R0 = 0 THEN PRINT "V"; V; " FAIL "; F; " CHECK WIRING" : END',
     '145 IF F <> 0 THEN PRINT "V"; V; " FAIL "; F : GOTO 190',
     '150 IF R0 = 0 THEN LET R0 = X : PRINT "BMP280 ID "; Q',
     '155 IF X <> R0 THEN PRINT "V"; V; " FAIL 3" : GOTO 190',
-    '160 PRINT "SPEED..."',
-    '162 GOSUB 1000 : IF F <> 0 THEN PRINT "V"; V; " FAIL SPEED" : GOTO 190',
+    '160 GOSUB 1000 : IF F <> 0 THEN PRINT "V"; V; " FAIL SPEED" : GOTO 190',
     '170 PRINT "V"; V; " OK R "; FQ; " kHz W "; FW; " kHz"',
     '175 PRINT "  READ 255 B = "; MS; " ms"',
     '190 NEXT V',
@@ -201,15 +200,12 @@ PROG = [
     '1110 Q = INT ((TIME - INT (TIME)) * 10000 + .5)',
     '1120 X = INT (Q / 100) * 60 + Q - 100 * INT (Q / 100) : RETURN',
     '1500 REM --- VERIFY: F=0 OK 1 BUS 2 ID 4 WRITE 5 READ BACK, X = SIGNATURE ---',
-    '1508 F = 0 : PRINT "ID"',
-    '1510 POKE TX, &D0 : POKE IA, D, 1, 1 : CALL IC, E',
+    '1510 F = 0 : POKE TX, &D0 : POKE IA, D, 1, 1 : CALL IC, E',
     '1515 IF E <> 0 THEN LET F = 1 : RETURN',
     '1520 Q = PEEK (RX) : IF (Q < 86 OR Q > 88) AND Q <> 96 THEN LET F = 2 : RETURN',
-    '1528 PRINT "CAL"',
     '1530 POKE TX, &88 : POKE IA, D, 1, 24 : CALL IC, E',
     '1535 IF E <> 0 THEN LET F = 1 : RETURN',
     '1540 X = 0 : FOR I = 0 TO 23 : X = X + (I + 1) * PEEK (RX + I) : NEXT I',
-    '1545 PRINT "WR"',
     '1550 FOR M = 0 TO 2 : P = M * 84 : POKE TX, &F5, P : POKE IA, D, 2, 0',
     '1551 CALL IC, E',
     '1552 IF E <> 0 THEN LET F = 4',
@@ -226,12 +222,10 @@ PROG = [
     '1850 GOSUB 1100 : H = X - W : IF H < 0 THEN LET H = H + 3600',
     '1860 IF H < 10 THEN 1840',
     '1870 RETURN',
-    '2000 REM --- POKE THE NEXT DATA BLOCK (ADDRESS,"HEX"... ; 0 ENDS) ---',
-    '2010 READ A : IF A = 0 THEN RETURN',
-    '2020 READ S$ : FOR I = 1 TO LEN (S$) STEP 2',
-    '2030 B = ASC (MID$ (S$, I, 1)) : IF B > 57 THEN LET B = B - 7',
-    '2040 C = ASC (MID$ (S$, I + 1, 1)) : IF C > 57 THEN LET C = C - 7',
-    '2050 POKE A, (B - 48) * 16 + C - 48 : A = A + 1 : NEXT I : GOTO 2010',
+    '2000 REM --- POKE THE NEXT DATA BLOCK (N,ADDRESS,BYTES...; 0 ENDS) ---',
+    '2010 READ N : IF N = 0 THEN RETURN',
+    '2020 READ A : FOR I = 1 TO N : READ B : POKE A, B : A = A + 1 : NEXT I',
+    '2030 GOTO 2010',
     '3500 REM --- FIRST INSTALLATION: NEW "S0:",&800 MUST HAVE BEEN TYPED ---',
     '3510 H = PEEK (63589) : H = H + 128 - 256 * INT (H / 128)',
     '3512 S = H * 256 + PEEK (63590)',
@@ -240,20 +234,23 @@ PROG = [
     '3530 RETURN',
 ]
 
+PROGRAMS = [('pc1600_z80_speedlab-v2.1_V0-V3.txt', 0, 3, 'V2.1A'),
+            ('pc1600_z80_speedlab-v2.1_V4-V5.txt', 4, 5, 'V2.1B'),
+            ('pc1600_z80_speedlab-v2.1_V6-V7.txt', 6, 7, 'V2.1C')]
 
-def data_lines(first, segs, per=30):
+
+def data_lines(first, segs, per=10):
     out, n = [], first
     for addr, data in segs:
         for i in range(0, len(data), per):
             c = data[i:i + per]
-            out.append('%d DATA %d,"%s"' % (n, addr + i, ''.join('%02X' % b for b in c)))
+            out.append('%d DATA %d,%d,%s' % (n, len(c), addr + i, ','.join(str(b) for b in c)))
             n += 1
     out.append('%d DATA 0' % n)
     return out
 
 
 def diff_segments(mem, image, gap=3):
-    """Runs of bytes of `image` that differ from the memory `mem` (a dict, updated); runs closer than `gap` are joined."""
     changed = sorted(a for a, v in image.items() if mem.get(a) != v)
     segs = []
     for a in changed:
@@ -268,48 +265,60 @@ def diff_segments(mem, image, gap=3):
     return [(a_, d_) for a_, d_ in segs]
 
 
-def build_basic():
-    imgs = [asm_of(v) for v in range(8)]          # V0 (base) .. V7
-    lines = list(PROG)
-    lines += data_lines(4000, imgs[0].segments())
-    mem = dict(imgs[0].image)
-    for k in range(1, 8):
-        lines += data_lines(4000 + 1000 * k, diff_segments(mem, imgs[k].image))
+def build_one(first, last, ver):
+    imgs = {v: asm_of(v) for v in range(first, last + 1)}
+    lines = [l % dict(ver=ver, first=first, last=last) if '%(' in l else l for l in PROG]
+    lines += data_lines(4000, imgs[first].segments())
+    mem = dict(imgs[first].image)
+    for k in range(first + 1, last + 1):
+        lines += data_lines(4000 + 1000 * (k - first), diff_segments(mem, imgs[k].image))
     return '\n'.join(lines) + '\n', imgs
 
 
 def parse_blocks(text):
-    """DATA blocks (start line 4000, 5000, ...) -> {block: {address: byte}}"""
-    out, cur = {}, None
+    nums_by_block, cur = {}, None
     for ln in text.splitlines():
-        m = re.match(r'^(\d+) DATA (\d+)(?:,"([0-9A-F]*)")?$', ln)
+        m = re.match(r'^(\d+) DATA (.*)$', ln)
         if not m:
             continue
-        ln_no, addr, hexs = int(m.group(1)), int(m.group(2)), m.group(3)
-        if ln_no % 1000 == 0:
-            cur = ln_no
-            out[cur] = {}
-        if hexs:
-            for i in range(0, len(hexs), 2):
-                out[cur][addr + i // 2] = int(hexs[i:i + 2], 16)
+        n = int(m.group(1))
+        if n % 1000 == 0:
+            cur = n
+            nums_by_block[cur] = []
+        nums_by_block[cur] += [int(x) for x in m.group(2).split(',')]
+    out = {}
+    for k, nums in nums_by_block.items():
+        mem, i = {}, 0
+        while nums[i] != 0:
+            n, addr = nums[i], nums[i + 1]
+            for j in range(n):
+                mem[addr + j] = nums[i + 2 + j]
+            i += 2 + n
+        out[k] = mem
     return out
 
 
 if __name__ == '__main__':
     write_sources()
-    text, imgs = build_basic()
-    if '--check' in sys.argv:
-        t = open(BAS).read()
-        blocks = parse_blocks(t)
-        mem = dict(blocks[4000])
-        oks = [mem == dict(imgs[0].image)]
-        for k in range(1, 8):
-            mem.update(blocks[4000 + 1000 * k])
-            oks.append(all(mem.get(a_) == v for a_, v in imgs[k].image.items()))
-        longest = max(len(l) for l in t.splitlines())
-        nums = [int(m.group(1)) for m in re.finditer(r'^(\d+) ', t, re.M)]
-        print('lab: V0..V3 installed in order reproduce the assembler images %s | up to date %s | longest line %d | ascending %s'
-              % (oks, t == text, longest, nums == sorted(set(nums))))
-        sys.exit(0 if all(oks) and t == text and longest <= 80 and nums == sorted(set(nums)) else 1)
-    open(BAS, 'w').write(text)
-    print('written', BAS, len(text.splitlines()), 'lines')
+    bad = 0
+    for fn, first, last, ver in PROGRAMS:
+        text, imgs = build_one(first, last, ver)
+        path = os.path.join(BAS_DIR, fn)
+        if '--check' in sys.argv:
+            t = open(path).read()
+            blocks = parse_blocks(t)
+            mem = dict(blocks[4000])
+            oks = [mem == dict(imgs[first].image)]
+            for k in range(first + 1, last + 1):
+                mem.update(blocks[4000 + 1000 * (k - first)])
+                oks.append(all(mem.get(a_) == v for a_, v in imgs[k].image.items()))
+            longest = max(len(l) for l in t.splitlines())
+            nums = [int(m.group(1)) for m in re.finditer(r'^(\d+) ', t, re.M)]
+            good = all(oks) and t == text and longest <= 80 and nums == sorted(set(nums))
+            print('%s: versions installed in order reproduce the assembler images %s | up to date %s | longest %d | ascending %s'
+                  % (fn, oks, t == text, longest, nums == sorted(set(nums))))
+            bad += 0 if good else 1
+        else:
+            open(path, 'w').write(text)
+            print('written', fn, len(text.splitlines()), 'lines')
+    sys.exit(1 if bad else 0)

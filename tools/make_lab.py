@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generates the speed-lab drivers asm/i2c_z80_lab_v0.asm, _v1.asm, _v2.asm (same entry points and
-main code, three versions of the bit loops) and the BASIC program Basic/pc1600_z80_speedlab-v1.5.txt.
+main code, three versions of the bit loops) and the BASIC program Basic/pc1600_z80_speedlab-v1.6.txt.
 
 V0: the loops of the driver v1.0 (a NOP in every clock, 3 port accesses and register copies when reading)
 V1: V0 without the NOPs, and a shorter receive loop (no register copies)
@@ -155,10 +155,10 @@ def write_sources():
 
 
 
-BAS = os.path.join(ROOT, 'Basic', 'pc1600_z80_speedlab-v1.5.txt')
+BAS = os.path.join(ROOT, 'Basic', 'pc1600_z80_speedlab-v1.6.txt')
 
 PROG = [
-    '10 REM *** PC-1600 Z80 I2C SPEED LAB V1.5 (INSTALLER+SPEED+BMP280 TEST) ***',
+    '10 REM *** PC-1600 Z80 I2C SPEED LAB V1.6 (INSTALLER+SPEED+BMP280 TEST) ***',
     '20 REM FIRST: NEW "S0:",&800. BMP280 AT &77. SDA DIODE ON PIN 31 (Z80)',
     '30 CLEAR : WAIT 0 : D = &77 : IC = &C400 : IA = &C5FC : TX = &C700 : RX = &C600',
     '40 IF PEEK (&C500) <> 243 THEN GOSUB 3500',
@@ -178,10 +178,6 @@ PROG = [
     '110 IF V > 3 THEN GOSUB 2000',
     '112 IF V < F0 THEN 190',
     '120 WAIT 64 : PRINT "TRY V"; V : WAIT 128',
-    '125 PRINT "PING"',
-    '126 E = 0 : POKE IA, D, 0, 0',
-    '127 CALL IC, E',
-    '128 PRINT "PING E="; E',
     '130 GOSUB 1500',
     '140 IF F <> 0 AND R0 = 0 THEN PRINT "V"; V; " FAIL "; F; " CHECK WIRING" : END',
     '145 IF F <> 0 THEN PRINT "V"; V; " FAIL "; F : GOTO 190',

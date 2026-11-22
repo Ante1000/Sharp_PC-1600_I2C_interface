@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generates the speed-lab drivers asm/i2c_z80_lab_v0.asm, _v1.asm, _v2.asm (same entry points and
-main code, three versions of the bit loops) and the BASIC program Basic/pc1600_z80_speedlab-v1.3.txt.
+main code, three versions of the bit loops) and the BASIC program Basic/pc1600_z80_speedlab-v1.4.txt.
 
 V0: the loops of the driver v1.0 (a NOP in every clock, 3 port accesses and register copies when reading)
 V1: V0 without the NOPs, and a shorter receive loop (no register copies)
@@ -155,10 +155,10 @@ def write_sources():
 
 
 
-BAS = os.path.join(ROOT, 'Basic', 'pc1600_z80_speedlab-v1.3.txt')
+BAS = os.path.join(ROOT, 'Basic', 'pc1600_z80_speedlab-v1.4.txt')
 
 PROG = [
-    '10 REM *** PC-1600 Z80 I2C SPEED LAB V1.3 (INSTALLER+SPEED+BMP280 TEST) ***',
+    '10 REM *** PC-1600 Z80 I2C SPEED LAB V1.4 (INSTALLER+SPEED+BMP280 TEST) ***',
     '20 REM FIRST: NEW "S0:",&800. BMP280 AT &77. SDA DIODE ON PIN 31 (Z80)',
     '30 CLEAR : WAIT 0 : D = &77 : IC = &C400 : IA = &C5FC : TX = &C700 : RX = &C600',
     '40 IF PEEK (&C500) <> 243 THEN GOSUB 3500',
@@ -173,15 +173,19 @@ PROG = [
     '55 FOR J = 0 TO 2 : A = 50432 + J * 32 : GOSUB 1800',
     '60 U = (H / N - OV) * 1000000 / 2560 : T$ = MID$ ("OUT IN  NOP ", J * 4 + 1, 4)',
     '65 PRINT T$; INT (U * 100 + .5) / 100; " us" : NEXT J',
+    '96 F0 = 3 : INPUT "START AT V (3-7, ENTER=3)"; F0',
     '100 R0 = 0 : FOR V = 3 TO 7',
     '110 IF V > 3 THEN GOSUB 2000',
+    '112 IF V < F0 THEN 190',
     '120 WAIT 64 : PRINT "TRY V"; V : WAIT 128',
+    '125 PRINT "PING"; : E = 0 : POKE IA, D, 0, 0 : CALL IC, E : PRINT E',
     '130 GOSUB 1500',
-    '140 IF F <> 0 AND V = 3 THEN PRINT "V3 FAIL "; F; " CHECK WIRING" : END',
+    '140 IF F <> 0 AND R0 = 0 THEN PRINT "V"; V; " FAIL "; F; " CHECK WIRING" : END',
     '145 IF F <> 0 THEN PRINT "V"; V; " FAIL "; F : GOTO 190',
-    '150 IF V = 3 THEN LET R0 = X : PRINT "BMP280 ID "; Q',
-    '155 IF V > 3 AND X <> R0 THEN PRINT "V"; V; " FAIL 3" : GOTO 190',
-    '160 GOSUB 1000 : IF F <> 0 THEN PRINT "V"; V; " FAIL SPEED" : GOTO 190',
+    '150 IF R0 = 0 THEN LET R0 = X : PRINT "BMP280 ID "; Q',
+    '155 IF X <> R0 THEN PRINT "V"; V; " FAIL 3" : GOTO 190',
+    '160 PRINT "SPEED..."',
+    '162 GOSUB 1000 : IF F <> 0 THEN PRINT "V"; V; " FAIL SPEED" : GOTO 190',
     '170 PRINT "V"; V; " OK R "; FQ; " kHz W "; FW; " kHz"',
     '175 PRINT "  READ 255 B = "; MS; " ms"',
     '190 NEXT V',
@@ -198,12 +202,13 @@ PROG = [
     '1110 Q = INT ((TIME - INT (TIME)) * 10000 + .5)',
     '1120 X = INT (Q / 100) * 60 + Q - 100 * INT (Q / 100) : RETURN',
     '1500 REM --- VERIFY: F=0 OK 1 BUS 2 ID 4 WRITE 5 READ BACK, X = SIGNATURE ---',
-    '1510 F = 0 : POKE TX, &D0 : POKE IA, D, 1, 1 : CALL IC, E',
+    '1510 F = 0 : PRINT "ID"; : POKE TX, &D0 : POKE IA, D, 1, 1 : CALL IC, E',
     '1515 IF E <> 0 THEN LET F = 1 : RETURN',
     '1520 Q = PEEK (RX) : IF (Q < 86 OR Q > 88) AND Q <> 96 THEN LET F = 2 : RETURN',
-    '1530 POKE TX, &88 : POKE IA, D, 1, 24 : CALL IC, E',
+    '1530 PRINT " CAL"; : POKE TX, &88 : POKE IA, D, 1, 24 : CALL IC, E',
     '1535 IF E <> 0 THEN LET F = 1 : RETURN',
     '1540 X = 0 : FOR I = 0 TO 23 : X = X + (I + 1) * PEEK (RX + I) : NEXT I',
+    '1545 PRINT " WR"',
     '1550 FOR M = 0 TO 2 : P = M * 84 : POKE TX, &F5, P : POKE IA, D, 2, 0',
     '1551 CALL IC, E',
     '1552 IF E <> 0 THEN LET F = 4',

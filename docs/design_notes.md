@@ -58,7 +58,7 @@ page and I has the same bit 0, A8 is static. The consequences, all handled by th
 4. If SCL is high when the routine is entered, the first instructions can produce START/STOP
    pairs (BASIC's I and the page of the code disagree): SDO should idle low.
 
-### The LH-5803 variant (not built)
+### The LH-5803 variant (built, see the README)
 
 `XCALL` runs LH5801 code on the LH-5803 (the PC-1500 CPU, 1.3 MHz) with the Z80 halted.
 Measured: `XPOKE# &F008,&80` / `0` moves pin 29 (PC7 = SDO), `XPEEK#(&F00F)` bit 2 follows pin 27

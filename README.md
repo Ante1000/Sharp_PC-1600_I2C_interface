@@ -222,6 +222,35 @@ reproducing the program bytes of the recording `sl1600_mode1_CE-150.wav` of SerC
 recording is decoded back and compared with the text (`--check`). **The recordings have not yet
 been played into a real PC-1600.**
 
+## LH-5803 variant (for comparison)
+
+`asm/i2c_lh_v1.0.asm` is the PC-1500 driver (v1.4 of the
+[PC-1500 repository](https://github.com/Ante1000/Sharp_PC-1500_I2C_interface)) adapted to the PC-1600 and run
+on the **LH-5803** with `XCALL` (the CPU of the PC-1500, 1.3 MHz, the Z80 is stopped meanwhile). It
+keeps **pins 29 (SCL) and 27 (SDA read)** and drives SDA with **pin 15 (PU)** instead of pin 31 (A8):
+`RPU` pulls the line low through the diode, `SPU` releases it. So **move the SDA diode from pin 31 to pin 15**
+(cathode toward the pin). The rest of the wiring is the same.
+
+| | Z80 driver | LH-5803 driver |
+|---|---|---|
+| SCL | pin 29, OUT (18H) bit 7 | pin 29, port C &F008 bit 7 |
+| SDA read | pin 27, IN (1FH) bit 2 | pin 27, OPB &F00F bit 2 |
+| SDA drive | pin 31 (A8) by code page and I | pin 15 (PU): `SPU` / `RPU`, 4 cycles |
+| code | 369 bytes | 217 bytes (the PC-1500 v1.4 has 252) |
+| call | `POKE &C5FC,D,W,R : CALL &C400,E` | `POKE &CCFC,D,W,R : XCALL &4C00,E` |
+| buffers | TX &C700, RX &C600 | TX &CB00, RX &CA00 (Z80 addresses of the same RAM) |
+| speed | about 35 kHz (simulator) | about 20 kHz (estimate from the cycle counts, **not simulated**) |
+
+Both can be installed at the same time (their memory does not overlap): installer
+`Basic/pc1600_i2c_lh_installer-v1.0.txt` (`NEW "S0:",&1000` first), program `Basic/pc1600_bmp280_lh-v1.0.txt`,
+which is the Z80 BMP280 program with the addresses and `XCALL` changed (it prints the I2C speed in the
+same way, so the two drivers can be compared on the same sensor).
+The LH source was assembled with `tools/lh5801asm_mini.py`, which reproduces the listing of the PC-1500 v1.4
+byte for byte (`--selftest`); the changes against v1.4 only replace the SDA operations, so the flags that
+the branches use are untouched. The variant has **not been simulated or run on a real PC-1600**.
+Known unknowns: PU is also a memory bank signal for the slots (PU is left high when the routine returns:
+use it without memory cards for now); the interrupts of the LH-5803 are not switched on at the end (no `SIE`).
+
 ## Limitations
 
 - **Pin 29 (SDO) should be low when the computer is idle.** If it is high, the first
@@ -290,7 +319,9 @@ compared with the real machine.
 | `Basic/pc1600_bmp280-v1.0.txt` | thermometer and barometer with a BMP280 (address &77) that also shows the approximate I2C speed, see below |
 | `wav/*_mode0_CE-1600P.wav` | the installer (`I2CZ80`) and the BMP280 program (`BMP280`) as tape recordings in the PC-1600 format (MODE 0, `LOAD "CAS:NAME"`) |
 | `wav/*_mode1_CE-150.wav` | the same programs in the PC-1500 / CE-150 format (MODE 1, `CLOAD`) |
-| `tools/` | mini assembler, simulator with the tests, installer generator, `pc1600_bas2wav.py` (BASIC text to a MODE 1 / CE-150 recording), `pc1600_cas_bas2wav.py` (to a MODE 0 / CE-1600P recording, from the Software UART repository) |
+| `asm/i2c_lh_v1.0.asm`, `.lst`, `Basic/pc1600_i2c_lh_installer-v1.0.txt`, `Basic/pc1600_bmp280_lh-v1.0.txt` | the LH-5803 variant (PC-1500 driver adapted, `XCALL`), its installer and BMP280 program, for comparison with the Z80 driver, see below |
+| `wav/*` | the four programs as tape recordings: `_mode1_CE-150.wav` (PC-1500 format, `CLOAD` in MODE 1) and `_mode0_CE-1600P.wav` (PC-1600 format, `LOAD "CAS:NAME"`) |
+| `tools/` | mini assemblers (Z80 and LH5801), simulator with the tests, installer generators, simulator with the tests, installer generator, `pc1600_bas2wav.py` (BASIC text to a MODE 1 / CE-150 recording), `pc1600_cas_bas2wav.py` (to a MODE 0 / CE-1600P recording, from the Software UART repository) |
 | `docs/design_notes.md` | analysis: pins, registers, alternatives that were considered |
 
 ## Sources

@@ -190,8 +190,8 @@ Pressure = 1006.53 hPa
 I2C approx. 34 kHz
 ```
 
-The speed is measured with 255-byte reads from the sensor for 3 seconds with the clock of the
-computer (`TIME`) as the time base, counting the SCL clocks (2322 per read). It is an
+The speed is measured with 255-byte reads from the sensor for 4 seconds with the clock of the
+computer (`TIME`, read after every 4 reads to keep its overhead small) as the time base, counting the SCL clocks (2322 per read); the time of one 255-byte read in ms is printed too. It is an
 approximate **effective** value, a few percent below the real SCL frequency because it includes the
 BASIC statements between the reads. It is measured at the start, and again when you press **S**
 during the measurement loop (any other key stops the program).

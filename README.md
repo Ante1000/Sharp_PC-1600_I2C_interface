@@ -302,7 +302,11 @@ The speed lab (below) produced a faster Z80 driver, **v1.1** (`asm/i2c_z80_v1.1.
 | `Basic/pc1600_bmp280-v1.1.txt` | the BMP280 program for v1.1; its speed meter now uses the routine `REP` of the driver (10 reads per `CALL`) and subtracts the time of an empty `CALL`, so it shows the real SCL speed (takes about 25 s) |
 | `Basic/pc1600_i2c_z80_bmp280-v1.1.txt` | both in one file (about 2.4 KB of memory stay free) |
 
-`tools/make_v11.py` builds them (`--check` compares the DATA lines with the assembler). The BMP280 program v1.1 was run on the real machine (255-byte read 50 to 54 ms, 43 to 47 kHz); the v1.0 files stay as they are.
+`tools/make_v11.py` builds them (`--check` compares the DATA lines with the assembler). Review of v1.1 (after the first measurements): the one finding was in the entry code, which reads the interrupt flag with `LD A,I`. On an NMOS Z80 an interrupt that arrives
+during that instruction gives P/V = 0 although the interrupts are enabled; the driver would then not execute `EI` at the exit and BASIC would go on with the interrupts off (the clock
+`TIME` stops). v1.1 therefore reads a 0 twice before it believes it (the v1.0 files have the same weakness). Other limits: the routine `REP` needs K >= 1 (K = 0 means 256 transfers), the buffers
+allow 255 bytes, there is no clock stretching (SCL is a push-pull output). Remaining ideas (a self-modified byte counter, `INC L` instead of `INC HL`) would save about 1 % and were not made.
+The BMP280 program v1.1 was run on the real machine (255-byte read 50 to 54 ms, 43 to 47 kHz); the v1.0 files stay as they are.
 
 ## Z80 speed lab
 

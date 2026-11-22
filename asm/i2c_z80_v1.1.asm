@@ -335,7 +335,11 @@ DONEB:  LD D,0
 IC:     LD A,S_L1
         OUT (OPC),A             ; SCL low at once: from here on A8 may chop
         LD A,I
-        PUSH AF                 ; I and IFF2 (P/V flag)
+        JP PE,IC1               ; P/V = IFF2 = 1: believed at once
+        LD A,I                  ; 0 is read twice (an interrupt during LD A,I of an NMOS Z80
+                                ; gives P/V = 0 although the interrupts are enabled, and the
+                                ; EI at the exit would be lost)
+IC1:    PUSH AF                 ; I and IFF2 (P/V flag)
         DI
         IN A,(DDB)
         AND 0FBh

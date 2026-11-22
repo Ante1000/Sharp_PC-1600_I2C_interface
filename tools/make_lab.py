@@ -214,7 +214,16 @@ RP1:    CALL IC
         JR NZ,RP1
 RP2:    RET
 '''
-    return head + eq + 'RPT     EQU 0C5FAh\nRCT     EQU 0C5F9h\n' + L8.pages(10) + '\n' + L8.main(10, MAIN) + tail
+    main = L8.main(10, MAIN)
+    fix_old = '        LD A,I\n        PUSH AF                 ; I and IFF2 (P/V flag)\n'
+    assert fix_old in main
+    main = main.replace(fix_old, '        LD A,I\n'
+                        '        JP PE,IC1               ; P/V = IFF2 = 1: believed at once\n'
+                        '        LD A,I                  ; 0 is read twice (an interrupt during LD A,I of an NMOS Z80\n'
+                        '                                ; gives P/V = 0 although the interrupts are enabled, and the\n'
+                        '                                ; EI at the exit would be lost)\n'
+                        'IC1:    PUSH AF                 ; I and IFF2 (P/V flag)\n')
+    return head + eq + 'RPT     EQU 0C5FAh\nRCT     EQU 0C5F9h\n' + L8.pages(10) + '\n' + main + tail
 
 
 def asm_of(v):

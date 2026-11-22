@@ -335,107 +335,111 @@ C3A4  C9                   RET
 C400  3E 01        IC:     LD A,S_L1
 C402  D3 18                OUT (OPC),A             ; SCL low at once: from here on A8 may chop
 C404  ED 57                LD A,I
-C406  F5                   PUSH AF                 ; I and IFF2 (P/V flag)
-C407  F3                   DI
-C408  DB 1D                IN A,(DDB)
-C40A  E6 FB                AND 0FBh
-C40C  D3 1D                OUT (DDB),A             ; PB2 = input
-C40E  AF                   XOR A
-C40F  32 FF C5             LD (IS),A
-C412  CD 83 C4             CALL BUSCHK
-C415  DA 7C C4             JP C,E3
-C418  3A FD C5             LD A,(IW)
-C41B  B7                   OR A
-C41C  20 06                JR NZ,DOWR
-C41E  3A FE C5             LD A,(IR)
-C421  B7                   OR A
-C422  20 24                JR NZ,DORD              ; W = 0, R > 0: read at once
-C424  CD 96 C4     DOWR:   CALL START
-C427  3A FC C5             LD A,(IA)
-C42A  87                   ADD A,A
-C42B  4F                   LD C,A                  ; address, write bit = 0
-C42C  CD A4 C4             CALL SENDB
-C42F  CB 52                BIT 2,D
-C431  C2 6E C4             JP NZ,E1                ; no ACK
-C434  3A FD C5             LD A,(IW)
-C437  B7                   OR A
-C438  28 08                JR Z,AFTW
-C43A  CD B7 C4             CALL WRBLK
-C43D  CB 52                BIT 2,D
-C43F  C2 72 C4             JP NZ,E2
-C442  3A FE C5     AFTW:   LD A,(IR)
-C445  B7                   OR A
-C446  28 14                JR Z,DOSTOP
-C448  CD 96 C4     DORD:   CALL START              ; (repeated) START
-C44B  3A FC C5             LD A,(IA)
-C44E  87                   ADD A,A
-C44F  3C                   INC A
-C450  4F                   LD C,A                  ; address, read bit = 1
-C451  CD A4 C4             CALL SENDB
-C454  CB 52                BIT 2,D
-C456  C2 6E C4             JP NZ,E1
-C459  CD C8 C4             CALL RDB
-C45C  CD 9D C4     DOSTOP: CALL STOP
-C45F  F1           EXIT:   POP AF
-C460  ED 47                LD I,A                  ; I restored (flags are not changed)
-C462  E2 66 C4             JP PO,EX2               ; P/V = IFF2: interrupts were off
-C465  FB                   EI
-C466  3A FF C5     EX2:    LD A,(IS)
-C469  5F                   LD E,A
-C46A  16 00                LD D,0
-C46C  37                   SCF                     ; CALL IC,E returns the result in E
-C46D  C9                   RET
-C46E  3E 01        E1:     LD A,1
-C470  18 02                JR ERR
-C472  3E 02        E2:     LD A,2
-C474  32 FF C5     ERR:    LD (IS),A
-C477  CD 9D C4             CALL STOP
-C47A  18 E3                JR EXIT
-C47C  3E 03        E3:     LD A,3
-C47E  32 FF C5             LD (IS),A
-C481  18 DC                JR EXIT
+C406  EA 0B C4             JP PE,IC1               ; P/V = IFF2 = 1: believed at once
+C409  ED 57                LD A,I                  ; 0 is read twice (an interrupt during LD A,I of an NMOS Z80
+                                                  ; gives P/V = 0 although the interrupts are enabled, and the
+                                                  ; EI at the exit would be lost)
+C40B  F5           IC1:    PUSH AF                 ; I and IFF2 (P/V flag)
+C40C  F3                   DI
+C40D  DB 1D                IN A,(DDB)
+C40F  E6 FB                AND 0FBh
+C411  D3 1D                OUT (DDB),A             ; PB2 = input
+C413  AF                   XOR A
+C414  32 FF C5             LD (IS),A
+C417  CD 88 C4             CALL BUSCHK
+C41A  DA 81 C4             JP C,E3
+C41D  3A FD C5             LD A,(IW)
+C420  B7                   OR A
+C421  20 06                JR NZ,DOWR
+C423  3A FE C5             LD A,(IR)
+C426  B7                   OR A
+C427  20 24                JR NZ,DORD              ; W = 0, R > 0: read at once
+C429  CD 9B C4     DOWR:   CALL START
+C42C  3A FC C5             LD A,(IA)
+C42F  87                   ADD A,A
+C430  4F                   LD C,A                  ; address, write bit = 0
+C431  CD A9 C4             CALL SENDB
+C434  CB 52                BIT 2,D
+C436  C2 73 C4             JP NZ,E1                ; no ACK
+C439  3A FD C5             LD A,(IW)
+C43C  B7                   OR A
+C43D  28 08                JR Z,AFTW
+C43F  CD BC C4             CALL WRBLK
+C442  CB 52                BIT 2,D
+C444  C2 77 C4             JP NZ,E2
+C447  3A FE C5     AFTW:   LD A,(IR)
+C44A  B7                   OR A
+C44B  28 14                JR Z,DOSTOP
+C44D  CD 9B C4     DORD:   CALL START              ; (repeated) START
+C450  3A FC C5             LD A,(IA)
+C453  87                   ADD A,A
+C454  3C                   INC A
+C455  4F                   LD C,A                  ; address, read bit = 1
+C456  CD A9 C4             CALL SENDB
+C459  CB 52                BIT 2,D
+C45B  C2 73 C4             JP NZ,E1
+C45E  CD CD C4             CALL RDB
+C461  CD A2 C4     DOSTOP: CALL STOP
+C464  F1           EXIT:   POP AF
+C465  ED 47                LD I,A                  ; I restored (flags are not changed)
+C467  E2 6B C4             JP PO,EX2               ; P/V = IFF2: interrupts were off
+C46A  FB                   EI
+C46B  3A FF C5     EX2:    LD A,(IS)
+C46E  5F                   LD E,A
+C46F  16 00                LD D,0
+C471  37                   SCF                     ; CALL IC,E returns the result in E
+C472  C9                   RET
+C473  3E 01        E1:     LD A,1
+C475  18 02                JR ERR
+C477  3E 02        E2:     LD A,2
+C479  32 FF C5     ERR:    LD (IS),A
+C47C  CD A2 C4             CALL STOP
+C47F  18 E3                JR EXIT
+C481  3E 03        E3:     LD A,3
+C483  32 FF C5             LD (IS),A
+C486  18 DC                JR EXIT
                   
-C483  3E 01        BUSCHK: LD A,HV                 ; up to 10 clocks until SDA is high
-C485  ED 47                LD I,A
-C487  06 0A                LD B,10
-C489  CD 00 C1     BC1:    CALL WH
-C48C  CB 52                BIT 2,D
-C48E  20 04                JR NZ,BCOK
-C490  10 F7                DJNZ BC1
-C492  37                   SCF                     ; SDA stuck low
-C493  C9                   RET
-C494  B7           BCOK:   OR A
-C495  C9                   RET
+C488  3E 01        BUSCHK: LD A,HV                 ; up to 10 clocks until SDA is high
+C48A  ED 47                LD I,A
+C48C  06 0A                LD B,10
+C48E  CD 00 C1     BC1:    CALL WH
+C491  CB 52                BIT 2,D
+C493  20 04                JR NZ,BCOK
+C495  10 F7                DJNZ BC1
+C497  37                   SCF                     ; SDA stuck low
+C498  C9                   RET
+C499  B7           BCOK:   OR A
+C49A  C9                   RET
                   
-C496  3E 01        START:  LD A,HV
-C498  ED 47                LD I,A
-C49A  C3 F5 C1             JP STH
-C49D  3E 00        STOP:   LD A,LV
-C49F  ED 47                LD I,A
-C4A1  C3 F5 C2             JP STL
-C4A4  59           SENDB:  LD E,C
-C4A5  3A FD C5             LD A,(IW)
-C4A8  6F                   LD L,A
-C4A9  26 C7                LD H,TXH
-C4AB  01 18 00             LD BC,0018h
-C4AE  16 80                LD D,80h
-C4B0  3E 00                LD A,LV
-C4B2  ED 47                LD I,A
-C4B4  C3 20 C2             JP SL
-C4B7  21 00 C7     WRBLK:  LD HL,TX
-C4BA  5E                   LD E,(HL)
-C4BB  23                   INC HL
-C4BC  01 18 01             LD BC,0118h
-C4BF  16 80                LD D,80h
-C4C1  3E 01                LD A,HV
-C4C3  ED 47                LD I,A
-C4C5  C3 40 C1             JP SH7
-C4C8  21 00 C6     RDB:    LD HL,RX
-C4CB  01 18 01             LD BC,0118h
-C4CE  16 80                LD D,80h
-C4D0  3E 01                LD A,HV
-C4D2  ED 47                LD I,A
-C4D4  C3 10 C3             JP RDB1
+C49B  3E 01        START:  LD A,HV
+C49D  ED 47                LD I,A
+C49F  C3 F5 C1             JP STH
+C4A2  3E 00        STOP:   LD A,LV
+C4A4  ED 47                LD I,A
+C4A6  C3 F5 C2             JP STL
+C4A9  59           SENDB:  LD E,C
+C4AA  3A FD C5             LD A,(IW)
+C4AD  6F                   LD L,A
+C4AE  26 C7                LD H,TXH
+C4B0  01 18 00             LD BC,0018h
+C4B3  16 80                LD D,80h
+C4B5  3E 00                LD A,LV
+C4B7  ED 47                LD I,A
+C4B9  C3 20 C2             JP SL
+C4BC  21 00 C7     WRBLK:  LD HL,TX
+C4BF  5E                   LD E,(HL)
+C4C0  23                   INC HL
+C4C1  01 18 01             LD BC,0118h
+C4C4  16 80                LD D,80h
+C4C6  3E 01                LD A,HV
+C4C8  ED 47                LD I,A
+C4CA  C3 40 C1             JP SH7
+C4CD  21 00 C6     RDB:    LD HL,RX
+C4D0  01 18 01             LD BC,0118h
+C4D3  16 80                LD D,80h
+C4D5  3E 01                LD A,HV
+C4D7  ED 47                LD I,A
+C4D9  C3 10 C3             JP RDB1
                   
                   ; ---------------------------------------------------------------------
                   ; C560: empty routine (the BASIC program times it to subtract the time of the BASIC CALL itself)

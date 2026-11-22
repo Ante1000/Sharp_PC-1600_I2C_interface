@@ -205,6 +205,8 @@ class Z80:
     IOW = 0   # extra wait states in an I/O cycle (the Z80 inserts one itself: 4 T)
     IOWIN = 0   # additional wait states of IN only (the real PB port is slow to read)
     IOWOUT = 0  # additional wait states of OUT only
+    M1W = 0     # extra wait states in every opcode fetch (M1) cycle
+    MRW = 0     # extra wait states in every memory read/write and operand fetch
 
     def __init__(self, hub):
         self.hub = hub
@@ -233,26 +235,26 @@ class Z80:
 
     def m1(self, extra=0):
         pc = self.pc
-        self.seg((pc >> 8) & 1, 2)
+        self.seg((pc >> 8) & 1, 2 + self.M1W)
         self.seg(self.I & 1, 2 + extra)
         self.pc = (self.pc + 1) & 0xFFFF
         return self.mem[pc]
 
     def mr(self, addr):
-        self.seg((addr >> 8) & 1, 3)
+        self.seg((addr >> 8) & 1, 3 + self.MRW)
         if self.hub.scl == 1:
             self.mem_accesses_with_scl_high.append((self.t, addr))
         return self.mem[addr & 0xFFFF]
 
     def mw(self, addr, v):
-        self.seg((addr >> 8) & 1, 3)
+        self.seg((addr >> 8) & 1, 3 + self.MRW)
         if self.hub.scl == 1:
             self.mem_accesses_with_scl_high.append((self.t, addr))
         self.mem[addr & 0xFFFF] = v & 0xFF
 
     def fetch_n(self):
         # operand fetch: a memory read from the code page (not a data access)
-        self.seg((self.pc >> 8) & 1, 3)
+        self.seg((self.pc >> 8) & 1, 3 + self.MRW)
         v = self.mem[self.pc]
         self.pc = (self.pc + 1) & 0xFFFF
         return v
@@ -848,6 +850,13 @@ if __name__ == '__main__':
         if arg.startswith('--iow='):
             Z80.IOW = int(arg.split('=')[1])
             print('extra I/O wait states: %d' % Z80.IOW)
+        elif arg == '--real':       # the model fitted to the real PC-1600 (port lab, speed lab)
+            Z80.M1W = 1
+            Z80.IOW = 1
+        elif arg.startswith('--m1w='):
+            Z80.M1W = int(arg.split('=')[1])
+        elif arg.startswith('--mrw='):
+            Z80.MRW = int(arg.split('=')[1])
         elif arg.startswith('--iowin='):
             Z80.IOWIN = int(arg.split('=')[1])
             print('extra wait states of IN: %d' % Z80.IOWIN)

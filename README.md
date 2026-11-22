@@ -251,6 +251,24 @@ the branches use are untouched. The variant has **not been simulated or run on a
 Known unknowns: PU is also a memory bank signal for the slots (PU is left high when the routine returns:
 use it without memory cards for now); the interrupts of the LH-5803 are not switched on at the end (no `SIE`).
 
+## Combined programs (driver + BMP280 in one file)
+
+For a quick start there is one BASIC program per driver that contains the machine code (in `DATA`
+lines from 4000) and the BMP280 program: `Basic/pc1600_i2c_z80_bmp280-v1.0.txt` (Z80 driver) and
+`Basic/pc1600_i2c_lh_bmp280-v1.0.txt` (LH-5803 driver; SDA diode on pin 15). Tape recordings
+(MODE 0, CE-1600P): `wav/pc1600_i2c_z80_bmp280-v1.0_mode0_CE-1600P.wav` (tape name `BMPZ80`, about 4.5 minutes) and
+`wav/pc1600_i2c_lh_bmp280-v1.0_mode0_CE-1600P.wav` (`BMPLH`, about 4 minutes).
+
+1. `NEW "S0:",&1000` (reserves the machine-language area; the program checks that the BASIC
+   program starts above it with the pointer formula of the SerComet Saver/Loader and stops with
+   `NEW S0:,&1000 FIRST` otherwise, because the code would overwrite the program).
+2. `LOAD "CAS:BMPZ80"` (or `BMPLH`) and `RUN`.
+3. Line 5 installs the driver when it is not in memory (a few seconds), then the BMP280 program starts.
+   Later runs find the driver and skip the installation.
+
+The files are made by `tools/make_combined.py` from the assembler sources and the BMP280 programs
+(`--check` compares the DATA lines with the assembler output). Like the other programs, **not yet tried on a real PC-1600**.
+
 ## Limitations
 
 - **Pin 29 (SDO) should be low when the computer is idle.** If it is high, the first
@@ -320,6 +338,8 @@ compared with the real machine.
 | `wav/*_mode0_CE-1600P.wav` | the installer (`I2CZ80`) and the BMP280 program (`BMP280`) as tape recordings in the PC-1600 format (MODE 0, `LOAD "CAS:NAME"`) |
 | `wav/*_mode1_CE-150.wav` | the same programs in the PC-1500 / CE-150 format (MODE 1, `CLOAD`) |
 | `asm/i2c_lh_v1.0.asm`, `.lst`, `Basic/pc1600_i2c_lh_installer-v1.0.txt`, `Basic/pc1600_bmp280_lh-v1.0.txt` | the LH-5803 variant (PC-1500 driver adapted, `XCALL`), its installer and BMP280 program, for comparison with the Z80 driver, see below |
+| `Basic/pc1600_i2c_z80_bmp280-v1.0.txt`, `Basic/pc1600_i2c_lh_bmp280-v1.0.txt` | **combined programs**: the driver installer and the BMP280 program in one BASIC file (Z80 driver / LH-5803 driver), see below |
+| `wav/pc1600_i2c_z80_bmp280-v1.0_mode0_CE-1600P.wav`, `wav/pc1600_i2c_lh_bmp280-v1.0_mode0_CE-1600P.wav` | the two combined programs for `LOAD "CAS:BMPZ80"` / `"CAS:BMPLH"` (MODE 0, CE-1600P) |
 | `wav/*` | the four programs as tape recordings: `_mode1_CE-150.wav` (PC-1500 format, `CLOAD` in MODE 1) and `_mode0_CE-1600P.wav` (PC-1600 format, `LOAD "CAS:NAME"`) |
 | `tools/` | mini assemblers (Z80 and LH5801), simulator with the tests, installer generators, simulator with the tests, installer generator, `pc1600_bas2wav.py` (BASIC text to a MODE 1 / CE-150 recording), `pc1600_cas_bas2wav.py` (to a MODE 0 / CE-1600P recording, from the Software UART repository) |
 | `docs/design_notes.md` | analysis: pins, registers, alternatives that were considered |

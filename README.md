@@ -291,46 +291,39 @@ Made by `tools/make_diag.py`; assembled with the checked LH assembler, **not tri
 
 ## Z80 speed lab
 
-`Basic/pc1600_z80_speedlab-v1.2.txt` (tape `wav/pc1600_z80_speedlab-v1.2_mode0_CE-1600P.wav`, name `Z80LAB`)
-installs the Z80 driver and measures how fast it really is and what limits it.
+`Basic/pc1600_z80_speedlab-v1.3.txt` (tape `wav/pc1600_z80_speedlab-v1.3_mode0_CE-1600P.wav`, name `Z80LAB`) installs
+the Z80 driver and measures how fast it really is, one small optimisation step at a time (V3 to V7). It verifies
+every version on the BMP280 (chip ID, a signature of the 24 calibration bytes, a write + read-back of the config
+register with three bit patterns) before it times it, and prints `TRY Vn` first, so a version that hangs the machine can be recognised.
 
-**Version 1.2:** each timing now takes 10 s with one `CALL` per `TIME` read (version 1.1 used 4 s and four calls, which rounded the
-results too coarsely: V1, V2 and V3 all showed 39 kHz). The first real results (v1.1): call overhead 83.3 ms, `OUT` 6.51 us, `IN` 6.51 us,
-`NOP` 2.96 us (about half the speed of the simulator in these loops), V0 read 28 kHz (83 ms per 255 bytes) and V1 to V3 39 kHz read
-and write (60 ms).
+**Measuring method.** The BASIC `CALL` statement itself is slow (83 ms per call on the real PC-1600), so the program first times
+an empty routine (`RET`) in the same loop, and subtracts that overhead; each timing takes 10 s with one `CALL` per `TIME` read.
+The result line is `Vn OK R <kHz> W <kHz>` (read and write of 255 bytes; the write test sends 255 zero bytes, which the BMP280
+takes as writes of 0 to the reserved register 0) and `READ 255 B = <ms>`. The port timing at the start (`OUT`, `IN`, `NOP`,
+overhead subtracted) is only informative.
 
-**Measuring method (important).** The BASIC `CALL` statement itself is slow (about 46 ms per call on the real
-PC-1600), so a plain timing of 255-byte reads gives far too low a speed (the first lab showed 16 kHz). Version 1.1 first
-times an empty routine (`RET`) in the same loop and subtracts that overhead from everything else:
+**The steps** (the numbers are the simulator, 3.58 MHz; V0 to V3 were measured on the real PC-1600 earlier):
 
-1. **Call overhead and port timing:** prints `BASIC CALL n ms`, then the time of one `OUT (18H)`, one `IN (1FH)` and one
-   `NOP` (2560 of each per call, overhead subtracted, in microseconds). On a real Z80 at 3.58 MHz expect about 3.4 us for
-   `OUT`/`IN` and about 1.1 us for `NOP`.
-2. **Speed ladder** V0 to V3 (it prints `TRY Vn` first, so a version that hangs the machine can be recognised). Every
-   version is verified on the BMP280 before it is timed: the chip ID, a signature of the 24 calibration bytes (must equal
-   V0's) and a write + read-back of the config register with three bit patterns (84, 168, 0). The result is
-   `Vn OK R <kHz> W <kHz>` and the time of a 255-byte read, or `Vn FAIL <code>` (1 bus error, 2 chip ID, 3 signature differs,
-   4 write error, 5 read-back differs, `FAIL SPEED`). The write speed is measured with 255 zero bytes (the BMP280 takes them as
-   writes of 0 to the reserved register 0, which does nothing).
+| Version | What changes | Sim write / read | Real write / read |
+|---|---|---|---|
+| V0 | the driver v1.0 (a NOP in every clock) | 36.9 / 34.4 kHz | 40 / 32 kHz |
+| V1 | no NOPs, shorter receive loop | 38.5 / 38.5 | 40 / 32 |
+| V2 | send loop unrolled (`BIT n,C`) | 43.7 / 38.5 | 52 / 32 |
+| V3 | receive loop unrolled (8 clocks, no loop) | 43.7 / 43.1 | 52 / 40 |
+| V4 | write block in the page code: no `CALL` per byte, ACK tested in `A`, byte counter in `E` | 48.9 / 43.1 | ? |
+| V5 | V4 + read block in the page code (ACK/NACK by jumps, no `CALL`/`RET` per byte) | 48.9 / 49.4 | ? |
+| V6 | V5 with the clocks as `OUT (C),r` (C = 18H, D = 80H, B = SDA state, E = byte) | 53.7 / 53.4 | ? |
+| V7 | V6 with I = B (HV = 1, LV = 0): the state change needs fewer instructions | 55.6 / 54.2 | ? |
 
-| Version | Bit loops | Simulator, write / read of 255 bytes |
-|---|---|---|
-| V0 | the driver v1.0 (a NOP in every clock) | 36.9 / 34.4 kHz |
-| V1 | no NOPs, shorter receive loop (no register copies) | 38.5 / 38.5 kHz |
-| V2 | V1 with the send loop unrolled (`BIT n,C`, no `RLC`/`DJNZ`) | 43.7 / 38.5 kHz |
-| V3 | V2 with the receive loop unrolled (eight clocks, no loop; in the H2 page) | 43.7 / 43.1 kHz |
+V6 and V7 shorten the SCL high time to 3.35 us (at 3.58 MHz): below the 4 us of the standard mode, but far above the 0.6 us of the fast mode
+that the BMP280 and most devices accept. V7 sets the I register to 0 / 1, so the refresh addresses lie in the ROM area (not tried on the machine).
+All eight versions pass the whole simulator test set (`python3 tools/z80_i2c_sim.py --asm=asm/i2c_z80_lab_v7.asm`, ...), including NACK after the
+address and after data, a stuck SDA, interrupts on or off, and random I.
 
-The first lab on the real machine gave `OUT` 21.7 us, `IN` 21.7 us and `NOP` 19.5 us per access, which was almost all call
-overhead; its difference (`OUT` minus `NOP` = 2.2 us) shows that a port access takes about as long as in the simulator,
-so the ports are not the limit. V0/V1/V2 read: 167 / 143 / 143 ms per 255 bytes including the overhead.
-
-The DATA lines hold V0 completely and for each next version only the bytes that differ from the previous one (the versions are
-installed in order V0, V1, V2, V3, so the program leaves about 2.8 KB for variables after `NEW "S0:",&800`).
-
-Use `NEW "S0:",&800` (the code needs only `&C0C5-&C7FF`), `LOAD "CAS:Z80LAB"` and `RUN`; answer `Y` to the question. The sources
-are `asm/i2c_z80_lab_v0.asm` to `_v3.asm` (generated by `tools/make_lab.py`, which also builds the BASIC program; `--check`
-compares the DATA lines with the assembler) and all four pass the whole simulator test set
-(`python3 tools/z80_i2c_sim.py --asm=asm/i2c_z80_lab_v3.asm`). **Not yet tried on a real PC-1600.**
+The DATA lines hold V3 completely and for each next version only the bytes that differ, as hexadecimal strings (the program leaves about 1.9 KB
+for variables after `NEW "S0:",&800`). The sources are `asm/i2c_z80_lab_v0.asm` to `_v7.asm`, generated by `tools/make_lab.py` and
+`tools/lab_v4plus.py` (`--check` compares the DATA lines with the assembler). Use `NEW "S0:",&800`, `LOAD "CAS:Z80LAB"` and `RUN`; answer `Y`
+to the question. **Not yet tried on a real PC-1600.**
 
 ## Limitations
 
@@ -404,7 +397,7 @@ compared with the real machine.
 | `Basic/pc1600_i2c_z80_bmp280-v1.0.txt`, `Basic/pc1600_i2c_lh_bmp280-v1.0.txt` | **combined programs**: the driver installer and the BMP280 program in one BASIC file (Z80 driver / LH-5803 driver), see below |
 | `wav/pc1600_i2c_z80_bmp280-v1.0_mode0_CE-1600P.wav`, `wav/pc1600_i2c_lh_bmp280-v1.0_mode0_CE-1600P.wav` | the two combined programs for `LOAD "CAS:BMPZ80"` / `"CAS:BMPLH"` (MODE 0, CE-1600P) |
 | `wav/*` | the four programs as tape recordings: `_mode1_CE-150.wav` (PC-1500 format, `CLOAD` in MODE 1) and `_mode0_CE-1600P.wav` (PC-1600 format, `LOAD "CAS:NAME"`) |
-| `Basic/pc1600_z80_speedlab-v1.2.txt`, `asm/i2c_z80_lab_v*.asm`, `wav/pc1600_z80_speedlab-v1.2_mode0_CE-1600P.wav` | the Z80 **speed lab**: installer, port benchmark, speed ladder V0-V3 verified on the BMP280, see below |
+| `Basic/pc1600_z80_speedlab-v1.3.txt`, `asm/i2c_z80_lab_v*.asm`, `wav/pc1600_z80_speedlab-v1.3_mode0_CE-1600P.wav` | the Z80 **speed lab**: installer, port benchmark, speed ladder V3-V7 verified on the BMP280, see below |
 | `tools/` | mini assemblers (Z80 and LH5801), simulator with the tests, installer generators, simulator with the tests, installer generator, `pc1600_bas2wav.py` (BASIC text to a MODE 1 / CE-150 recording), `pc1600_cas_bas2wav.py` (to a MODE 0 / CE-1600P recording, from the Software UART repository) |
 | `docs/design_notes.md` | analysis: pins, registers, alternatives that were considered |
 

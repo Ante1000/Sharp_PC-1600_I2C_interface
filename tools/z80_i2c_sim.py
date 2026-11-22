@@ -382,7 +382,13 @@ class Z80:
             self.F = self.szp(v) | c
             return
         if op == 0xED:
-            op2 = self.m1(extra=1)
+            op2 = self.m1()
+            if op2 & 0xC7 == 0x41:      # OUT (C),r
+                r = self.RN[(op2 >> 3) & 7]
+                self.io_out(R['B'], R['C'], R[r])
+                return
+            if op2 in (0x47, 0x57):
+                self.hold(1)            # LD I,A / LD A,I: one more T-state after the refresh
             if op2 == 0x47:
                 self.I = R['A']
                 return
@@ -449,6 +455,16 @@ class Z80:
             return
         if op == 0x21:
             self.set_hl(self.fetch_nn())
+            return
+        if op == 0x01:                  # LD BC,nn
+            nn = self.fetch_nn()
+            R['B'], R['C'] = nn >> 8, nn & 0xFF
+            return
+        if 0xB8 <= op <= 0xBF and op != 0xBE:   # CP r
+            r = self.RN[op & 7]
+            a, b = R['A'], R[r]
+            res = (a - b) & 0xFF
+            self.F = (self.szp(res) & ~self.PV) | self.N | (self.C if b > a else 0)
             return
         if op == 0x3A:
             nn = self.fetch_nn()

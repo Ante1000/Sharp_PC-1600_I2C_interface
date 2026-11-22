@@ -117,6 +117,10 @@ class Assembler:
             if n == 2 and up[0] in CC:
                 return [0xC2 + 8 * CC[up[0]]] + list(imm16(ops[1]).to_bytes(2, 'little'))
         if mn == 'CALL' and n == 1: return [0xCD] + list(imm16(ops[0]).to_bytes(2, 'little'))
+        if mn == 'OUT' and n == 2 and up[0] == '(C)' and up[1] in R8:
+            return [0xED, 0x41 + 8 * R8[up[1]]]
+        if mn == 'CP' and n == 1 and up[0] in R8:
+            return [0xB8 + R8[up[0]]]
         if mn == 'OUT' and n == 2 and up[1] == 'A' and ops[0].startswith('('):
             return [0xD3, imm8(ops[0][1:-1])]
         if mn == 'IN' and n == 2 and up[0] == 'A' and ops[1].startswith('('):
@@ -128,6 +132,8 @@ class Assembler:
             if d in R8 and s in R8: return [0x40 + 8 * R8[d] + R8[s]]
             if d in R8 and s == '(HL)': return [0x46 + 8 * R8[d]]
             if d == '(HL)' and s in R8: return [0x70 + R8[s]]
+            if d == 'BC' and not ops[1].startswith('('):
+                return [0x01] + list(imm16(ops[1]).to_bytes(2, 'little'))
             if d == 'HL' and not ops[1].startswith('('):
                 return [0x21] + list(imm16(ops[1]).to_bytes(2, 'little'))
             if d == 'A' and ops[1].startswith('(') and ops[1].endswith(')') and s != '(HL)':

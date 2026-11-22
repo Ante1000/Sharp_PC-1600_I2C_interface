@@ -291,8 +291,13 @@ Made by `tools/make_diag.py`; assembled with the checked LH assembler, **not tri
 
 ## Z80 speed lab
 
-`Basic/pc1600_z80_speedlab-v1.1.txt` (tape `wav/pc1600_z80_speedlab-v1.1_mode0_CE-1600P.wav`, name `Z80LAB`)
+`Basic/pc1600_z80_speedlab-v1.2.txt` (tape `wav/pc1600_z80_speedlab-v1.2_mode0_CE-1600P.wav`, name `Z80LAB`)
 installs the Z80 driver and measures how fast it really is and what limits it.
+
+**Version 1.2:** each timing now takes 10 s with one `CALL` per `TIME` read (version 1.1 used 4 s and four calls, which rounded the
+results too coarsely: V1, V2 and V3 all showed 39 kHz). The first real results (v1.1): call overhead 83.3 ms, `OUT` 6.51 us, `IN` 6.51 us,
+`NOP` 2.96 us (about half the speed of the simulator in these loops), V0 read 28 kHz (83 ms per 255 bytes) and V1 to V3 39 kHz read
+and write (60 ms).
 
 **Measuring method (important).** The BASIC `CALL` statement itself is slow (about 46 ms per call on the real
 PC-1600), so a plain timing of 255-byte reads gives far too low a speed (the first lab showed 16 kHz). Version 1.1 first
@@ -399,7 +404,7 @@ compared with the real machine.
 | `Basic/pc1600_i2c_z80_bmp280-v1.0.txt`, `Basic/pc1600_i2c_lh_bmp280-v1.0.txt` | **combined programs**: the driver installer and the BMP280 program in one BASIC file (Z80 driver / LH-5803 driver), see below |
 | `wav/pc1600_i2c_z80_bmp280-v1.0_mode0_CE-1600P.wav`, `wav/pc1600_i2c_lh_bmp280-v1.0_mode0_CE-1600P.wav` | the two combined programs for `LOAD "CAS:BMPZ80"` / `"CAS:BMPLH"` (MODE 0, CE-1600P) |
 | `wav/*` | the four programs as tape recordings: `_mode1_CE-150.wav` (PC-1500 format, `CLOAD` in MODE 1) and `_mode0_CE-1600P.wav` (PC-1600 format, `LOAD "CAS:NAME"`) |
-| `Basic/pc1600_z80_speedlab-v1.1.txt`, `asm/i2c_z80_lab_v*.asm`, `wav/pc1600_z80_speedlab-v1.1_mode0_CE-1600P.wav` | the Z80 **speed lab**: installer, port benchmark, speed ladder V0-V3 verified on the BMP280, see below |
+| `Basic/pc1600_z80_speedlab-v1.2.txt`, `asm/i2c_z80_lab_v*.asm`, `wav/pc1600_z80_speedlab-v1.2_mode0_CE-1600P.wav` | the Z80 **speed lab**: installer, port benchmark, speed ladder V0-V3 verified on the BMP280, see below |
 | `tools/` | mini assemblers (Z80 and LH5801), simulator with the tests, installer generators, simulator with the tests, installer generator, `pc1600_bas2wav.py` (BASIC text to a MODE 1 / CE-150 recording), `pc1600_cas_bas2wav.py` (to a MODE 0 / CE-1600P recording, from the Software UART repository) |
 | `docs/design_notes.md` | analysis: pins, registers, alternatives that were considered |
 

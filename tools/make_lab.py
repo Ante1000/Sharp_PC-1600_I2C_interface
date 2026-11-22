@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generates the speed-lab drivers asm/i2c_z80_lab_v0.asm, _v1.asm, _v2.asm (same entry points and
-main code, three versions of the bit loops) and the BASIC program Basic/pc1600_z80_speedlab-v1.1.txt.
+main code, three versions of the bit loops) and the BASIC program Basic/pc1600_z80_speedlab-v1.2.txt.
 
 V0: the loops of the driver v1.0 (a NOP in every clock, 3 port accesses and register copies when reading)
 V1: V0 without the NOPs, and a shorter receive loop (no register copies)
@@ -144,10 +144,10 @@ def write_sources():
 
 
 
-BAS = os.path.join(ROOT, 'Basic', 'pc1600_z80_speedlab-v1.1.txt')
+BAS = os.path.join(ROOT, 'Basic', 'pc1600_z80_speedlab-v1.2.txt')
 
 PROG = [
-    '10 REM *** PC-1600 Z80 I2C SPEED LAB V1.1 (INSTALLER+SPEED+BMP280 TEST) ***',
+    '10 REM *** PC-1600 Z80 I2C SPEED LAB V1.2 (INSTALLER+SPEED+BMP280 TEST) ***',
     '20 REM FIRST: NEW "S0:",&800. BMP280 AT &77. SDA DIODE ON PIN 31 (Z80)',
     '30 CLEAR : WAIT 0 : D = &77 : IC = &C400 : IA = &C5FC : TX = &C700 : RX = &C600',
     '40 IF PEEK (&C500) <> 243 THEN GOSUB 3500',
@@ -180,7 +180,7 @@ PROG = [
     '175 PRINT "  READ 255 B = "; MS; " ms"',
     '190 NEXT V',
     '195 WAIT 0 : END',
-    '1000 REM --- SPEED, 4 S EACH, MINUS CALL OVERHEAD OV: FQ READ, FW WRITE ---',
+    '1000 REM --- SPEED, 10 S EACH, MINUS CALL OVERHEAD OV: FQ READ, FW WRITE ---',
     '1010 POKE TX, &88 : POKE IA, D, 1, 255 : A = IC',
     '1015 GOSUB 1800 : IF F <> 0 THEN RETURN',
     '1020 T = H / N - OV : MS = INT (T * 1000 + .5) : FQ = INT (2322 / T / 1000 + .5)',
@@ -204,15 +204,15 @@ PROG = [
     '1554 POKE TX, &F5 : POKE IA, D, 1, 1 : CALL IC, E : IF E <> 0 THEN LET F = 4',
     '1556 IF PEEK (RX) <> P THEN LET F = 5',
     '1558 NEXT M : RETURN',
-    '1800 REM --- TIME CALLS OF THE ROUTINE AT A FOR 4 S: N CALLS IN H SECONDS ---',
+    '1800 REM --- TIME CALLS OF THE ROUTINE AT A FOR 10 S: N CALLS IN H SECONDS ---',
     '1805 F = 0 : E = 0',
     '1810 GOSUB 1100 : Y = X',
     '1820 GOSUB 1100 : IF X = Y THEN 1820',
     '1830 W = X : N = 0',
-    '1840 FOR K = 1 TO 4 : CALL A, E : NEXT K : N = N + 4',
+    '1840 CALL A, E : N = N + 1',
     '1845 IF E <> 0 THEN LET F = 1 : RETURN',
     '1850 GOSUB 1100 : H = X - W : IF H < 0 THEN LET H = H + 3600',
-    '1860 IF H < 4 THEN 1840',
+    '1860 IF H < 10 THEN 1840',
     '1870 RETURN',
     '2000 REM --- POKE DATA BLOCKS (N,ADDRESS,BYTES...; 0 ENDS) ---',
     '2010 READ N : IF N = 0 THEN RETURN',

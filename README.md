@@ -259,9 +259,10 @@ lines from 4000) and the BMP280 program: `Basic/pc1600_i2c_z80_bmp280-v1.0.txt` 
 (MODE 0, CE-1600P): `wav/pc1600_i2c_z80_bmp280-v1.0_mode0_CE-1600P.wav` (tape name `BMPZ80`, about 4.5 minutes) and
 `wav/pc1600_i2c_lh_bmp280-v1.0_mode0_CE-1600P.wav` (`BMPLH`, about 4 minutes).
 
-1. `NEW "S0:",&1000` (reserves the machine-language area; the program checks that the BASIC
-   program starts above it with the pointer formula of the SerComet Saver/Loader and stops with
-   `NEW S0:,&1000 FIRST` otherwise, because the code would overwrite the program).
+1. `NEW "S0:",&1000` (reserves the machine-language area; without it the code would overwrite the
+   BASIC program). On the first run the program shows where it starts and asks `DID YOU TYPE NEW S0 (Y)`:
+   answer `Y` only if you did. (An earlier version stopped by itself with the pointer formula of the
+   SerComet Saver/Loader, which gave a wrong value on the real machine; the value is now printed.)
 2. `LOAD "CAS:BMPZ80"` (or `BMPLH`) and `RUN`.
 3. Line 5 installs the driver when it is not in memory (a few seconds), then the BMP280 program starts.
    Later runs find the driver and skip the installation.
